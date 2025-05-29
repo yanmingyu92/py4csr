@@ -10,7 +10,7 @@ authors = [
 ]
 description = "Python for Clinical Study Reporting - Professional clinical trial reporting package"
 readme = "README.md"
-license = {file = "LICENSE"}
+license = "MIT"
 requires-python = ">=3.8"
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -18,7 +18,6 @@ classifiers = [
     "Intended Audience :: Healthcare Industry",
     "Topic :: Scientific/Engineering :: Medical Science Apps.",
     "Topic :: Scientific/Engineering :: Information Analysis",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
@@ -102,15 +101,12 @@ all = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/your-org/py4csr"
+Homepage = "https://github.com/yanmingyu92/py4csr"
 Documentation = "https://py4csr.readthedocs.io"
-Repository = "https://github.com/your-org/py4csr.git"
-"Bug Tracker" = "https://github.com/your-org/py4csr/issues"
-Changelog = "https://github.com/your-org/py4csr/blob/main/CHANGELOG.md"
-Discussions = "https://github.com/your-org/py4csr/discussions"
-
-[project.scripts]
-py4csr = "py4csr.cli.main:main"
+Repository = "https://github.com/yanmingyu92/py4csr.git"
+"Bug Tracker" = "https://github.com/yanmingyu92/py4csr/issues"
+Changelog = "https://github.com/yanmingyu92/py4csr/blob/main/CHANGELOG.md"
+Discussions = "https://github.com/yanmingyu92/py4csr/discussions"
 
 [tool.setuptools]
 packages = ["py4csr"]
