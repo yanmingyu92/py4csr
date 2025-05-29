@@ -218,7 +218,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - **Documentation**: [docs/](docs/)
 - **Examples**: [examples/](examples/)
-- **Issues**: [GitHub Issues](https://github.com/your-org/py4csr/issues)
+- **Issues**: [GitHub Issues](https://github.com/yanmingyu92/py4csr/issues)
 - **PyPI**: [https://pypi.org/project/py4csr/](https://pypi.org/project/py4csr/)
 
 ## 🙏 Acknowledgments
@@ -230,9 +230,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 📞 Support
 
 - **Documentation**: [https://py4csr.readthedocs.io](https://py4csr.readthedocs.io)
-- **Issues**: [GitHub Issues](https://github.com/your-org/py4csr/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/your-org/py4csr/discussions)
-- **Email**: support@py4csr.org
+- **Issues**: [GitHub Issues](https://github.com/yanmingyu92/py4csr/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/yanmingyu92/py4csr/discussions)
+- **Email**: yanmingyunmt@gmail.com
 
 ## 🗺️ Roadmap
 
