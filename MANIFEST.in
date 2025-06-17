@@ -1,0 +1,34 @@
+include README.md
+include LICENSE
+include CHANGELOG.md
+include CONTRIBUTING.md
+include requirements.txt
+include pyproject.toml
+
+# Documentation
+recursive-include docs *.md *.rst *.txt *.py
+recursive-include docs *.png *.jpg *.gif *.svg
+
+# Package data
+recursive-include py4csr/templates *.yaml *.json *.jinja2
+recursive-include py4csr/config *.yaml *.json
+recursive-include py4csr/examples *.py *.csv *.md
+
+# Tests (for source distributions)
+recursive-include tests *.py
+include tests/data/*.csv
+
+# Exclude development and build files
+exclude .gitignore
+exclude .pre-commit-config.yaml
+exclude tox.ini
+exclude .coverage
+exclude .pytest_cache
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]
+recursive-exclude * .DS_Store
+recursive-exclude archive *
+recursive-exclude .git *
+recursive-exclude build *
+recursive-exclude dist *
+recursive-exclude *.egg-info * 
