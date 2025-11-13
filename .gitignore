@@ -139,9 +139,33 @@ dmypy.json
 # VSCode
 .vscode/
 
-# Archive directory (development artifacts)
+# Archive directory (development artifacts, not for GitHub)
 archive/
 
+# Paper/publication materials (not for GitHub)
+jss_manuscript/
+jss_materials/
+paper/
+08_publication/
+
+# Experimental/research code (not for GitHub)
+agent/
+llm_learning_pipeline/
+04_generated_code/
+06_evaluation/
+py4csr_testing_suite/
+experiment_results/
+
+# Development documentation (not for GitHub)
+*_COMPLETE*.md
+*_PROGRESS*.md
+*_STATUS*.md
+*_PLAN*.md
+*_GUIDE*.md
+*_SUMMARY*.md
+*_REPORT*.md
+START_HERE.md
+CLEANUP_AND_GITHUB_PLAN.md
 # Generated output files (exclude from root and most directories, but allow in examples)
 /*.rtf
 /*.pdf

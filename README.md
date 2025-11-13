@@ -1,8 +1,11 @@
 # py4csr: Python for Clinical Study Reporting
 
-[![Python Version](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://python.org)
+[![Tests](https://img.shields.io/badge/tests-710%20passing-success.svg)](tests/)
+[![Coverage](https://img.shields.io/badge/coverage-46%25-yellow.svg)](htmlcov/)
+[![Python Version](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://python.org)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Documentation Status](https://img.shields.io/badge/docs-latest-brightgreen.svg)](docs/)
+[![Code Style](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Documentation](https://img.shields.io/badge/docs-sphinx-blue.svg)](docs/)
 [![Clinical Outputs](https://img.shields.io/badge/sample%20outputs-16%20examples-orange.svg)](examples/sample_outputs/)
 [![RTF Ready](https://img.shields.io/badge/RTF-regulatory%20ready-red.svg)](examples/sample_outputs/)
 [![Interactive HTML](https://img.shields.io/badge/HTML-interactive%20plots-brightgreen.svg)](examples/sample_outputs/figures/)
@@ -65,27 +68,89 @@ py4csr generates both regulatory-ready RTF files AND interactive HTML plots from
 
 ## 📦 Installation
 
-### From PyPI (Recommended)
+### Basic Installation
 ```bash
 pip install py4csr
 ```
 
-### From Source
+### With PDF Support
 ```bash
+pip install py4csr[pdf]
+```
+
+### Development Installation
+```bash
+# Clone the repository
 git clone https://github.com/yanmingyu92/py4csr.git
 cd py4csr
-pip install -e .
+
+# Install in development mode with all dependencies
+pip install -e ".[dev]"
 ```
 
-### Dependencies
-```bash
-# Core dependencies
-pip install pandas numpy scipy matplotlib seaborn
-pip install reportlab jinja2 openpyxl
+### Requirements
+- **Python**: 3.9 or higher
+- **Core dependencies**: pandas, numpy, scipy, matplotlib, seaborn
+- **Optional**: reportlab (for PDF output), openpyxl (for Excel output)
+- **Development**: pytest, black, mypy, sphinx (included in `[dev]` extra)
 
-# For SAS data reading
-pip install pyreadstat  # or sas7bdat
+## 🚀 Quick Start
+
+### Your First Clinical Report in 5 Minutes
+
+```python
+from py4csr.clinical import ClinicalSession
+import pandas as pd
+
+# Load your ADSL dataset
+adsl = pd.read_csv("data/adsl.csv")
+
+# Create a demographics table
+session = ClinicalSession(uri="STUDY001")
+session.define_report(
+    dataset=adsl,
+    subjid="USUBJID",
+    title="Table 14.1.1 Demographics and Baseline Characteristics"
+)
+
+# Add treatment groups
+session.add_trt(name="TRT01PN", decode="TRT01P", across="Y")
+
+# Add demographic variables
+session.add_var(name="AGE", label="Age (years)", stats="n mean+sd median q1q3 min+max")
+session.add_catvar(name="SEX", label="Sex, n (%)", stats="npct", codelist="M='Male',F='Female'")
+session.add_catvar(name="RACE", label="Race, n (%)", stats="npct")
+
+# Generate and save
+session.generate()
+session.finalize(output_path="demographics.rtf", format="rtf")
+
+print("✅ Demographics table created successfully!")
 ```
+
+### Using the Functional Interface
+
+```python
+from py4csr.reporting import ReportBuilder
+from py4csr.config import ReportConfig
+
+# Create report using method chaining
+config = ReportConfig()
+result = (ReportBuilder(config)
+    .init_study(uri="STUDY001", title="Phase III Clinical Study Report")
+    .add_dataset("adsl", adsl)
+    .define_populations(safety="SAFFL=='Y'", efficacy="EFFFL=='Y'")
+    .define_treatments(var="TRT01P")
+    .add_demographics_table(title="Demographics", population="safety")
+    .add_ae_summary_table(title="Adverse Events Summary", population="safety")
+    .generate_all(output_dir="reports")
+    .finalize()
+)
+
+print(f"✅ Generated {len(result.generated_files)} report files")
+```
+
+For more examples, see the [Quick Start Guide](docs/quickstart.rst) and [Examples](examples/).
 
 ## 🎯 Sample Outputs Showcase
 

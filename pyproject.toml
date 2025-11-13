@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "py4csr"
-version = "0.1.0"
+version = "0.1.1"
 authors = [
     {name = "py4csr Contributors", email = "info@py4csr.com"}
 ]
@@ -47,16 +47,20 @@ dependencies = [
     "jinja2>=3.0.0",
     "pyyaml>=5.4.0",
     "openpyxl>=3.0.0",
-    "reportlab>=3.6.0",
     "python-docx>=0.8.11",
     "xlsxwriter>=3.0.0",
     "tabulate>=0.8.9",
     "click>=8.0.0",
     "tqdm>=4.60.0",
-    "pathlib2>=2.3.0; python_version<'3.4'",
 ]
 
 [project.optional-dependencies]
+# PDF output support
+pdf = [
+    "reportlab>=3.6.0",
+]
+
+# Development tools
 dev = [
     "pytest>=6.0",
     "pytest-cov>=2.0",
@@ -72,23 +76,35 @@ dev = [
     "nbsphinx>=0.8",
     "jupyter>=1.0",
     "ipykernel>=6.0",
+    "build>=0.10.0",
+    "twine>=4.0.0",
+    "codecov>=2.1.0",
 ]
+
+# SAS file reading
 sas = [
     "pyreadstat>=1.1.0",
     "sas7bdat>=2.2.0",
 ]
+
+# Advanced plotting
 plotting = [
     "plotly>=5.0",
     "bokeh>=2.0",
     "seaborn>=0.11",
     "plotnine>=0.8",
 ]
+
+# Advanced statistics
 stats = [
     "statsmodels>=0.12.0",
     "scikit-learn>=1.0.0",
     "lifelines>=0.26.0",
 ]
+
+# All optional dependencies
 all = [
+    "reportlab>=3.6.0",
     "pyreadstat>=1.1.0",
     "sas7bdat>=2.2.0",
     "plotly>=5.0",
@@ -109,14 +125,14 @@ Changelog = "https://github.com/yanmingyu92/py4csr/blob/main/CHANGELOG.md"
 Discussions = "https://github.com/yanmingyu92/py4csr/discussions"
 
 [tool.setuptools]
-packages = ["py4csr"]
+packages = {find = {where = ["."], exclude = ["tests*", "docs*", "examples*", "archive*", "agent*", "llm_learning_pipeline*", "py4csr_testing_suite*", "paper*", "experiment_results*", "htmlcov*", "08_publication*", "04_generated_code*", "06_evaluation*"]}}
 
 [tool.setuptools.package-data]
 py4csr = [
+    "py.typed",
     "templates/*.yaml",
-    "templates/*.json", 
+    "templates/*.json",
     "config/*.yaml",
-    "examples/data/*.csv",
 ]
 
 # Black configuration
@@ -184,7 +200,7 @@ exclude_lines = [
 
 # MyPy configuration
 [tool.mypy]
-python_version = "3.8"
+python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true

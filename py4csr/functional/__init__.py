@@ -31,26 +31,29 @@ Example Usage:
     ...     .finalize())
 """
 
+from .config import (
+    FormatDefinition,
+    FunctionalConfig,
+    StatisticDefinition,
+    TableTemplate,
+)
+from .output_generators import HTMLGenerator, PDFGenerator, RTFGenerator
 from .session import ReportSession
-from .config import FunctionalConfig, StatisticDefinition, FormatDefinition, TableTemplate
-from .table_builder import TableBuilder
 from .statistical_templates import StatisticalTemplates
-from .output_generators import RTFGenerator, HTMLGenerator, PDFGenerator
+from .table_builder import TableBuilder
 
 __all__ = [
     # Main classes
-    'ReportSession',
-    'FunctionalConfig', 
-    'TableBuilder',
-    'StatisticalTemplates',
-    
+    "ReportSession",
+    "FunctionalConfig",
+    "TableBuilder",
+    "StatisticalTemplates",
     # Configuration
-    'StatisticDefinition',
-    'FormatDefinition', 
-    'TableTemplate',
-    
+    "StatisticDefinition",
+    "FormatDefinition",
+    "TableTemplate",
     # Output generators
-    'RTFGenerator',
-    'HTMLGenerator', 
-    'PDFGenerator'
-] 
+    "RTFGenerator",
+    "HTMLGenerator",
+    "PDFGenerator",
+]

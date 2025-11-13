@@ -31,4 +31,23 @@ recursive-exclude archive *
 recursive-exclude .git *
 recursive-exclude build *
 recursive-exclude dist *
-recursive-exclude *.egg-info * 
+recursive-exclude *.egg-info *
+recursive-exclude py4csr/*/archive *
+recursive-exclude py4csr/plotting/archive *
+recursive-exclude py4csr/clinical/archive *
+recursive-exclude py4csr/reporting/archive *
+prune py4csr/plotting/archive
+prune py4csr/clinical/archive
+prune py4csr/reporting/archive
+prune tests
+prune docs
+prune examples
+prune agent
+prune llm_learning_pipeline
+prune py4csr_testing_suite
+prune paper
+prune experiment_results
+prune htmlcov
+prune 08_publication
+prune 04_generated_code
+prune 06_evaluation
