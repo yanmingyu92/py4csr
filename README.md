@@ -406,8 +406,9 @@ If you use **py4csr** in your research or clinical reporting workflows, please c
   year         = {2026},
   publisher    = {Zenodo},
   doi          = {10.5281/zenodo.19621900},
-  url          = {[https://doi.org/10.5281/zenodo.19621900](https://doi.org/10.5281/zenodo.19621900)}
+  url          = {https://doi.org/10.5281/zenodo.19621900}
 }
+
 
 ## 🙏 Acknowledgments
 
