@@ -391,6 +391,24 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Issues**: [GitHub Issues](https://github.com/yanmingyu92/py4csr/issues)
 - **PyPI**: [https://pypi.org/project/py4csr/](https://pypi.org/project/py4csr/)
 
+## 📝 Citation
+
+If you use **py4csr** in your research or clinical reporting workflows, please cite it using the following DOI:
+
+**Text:**
+> Jaime Yan. (2026). py4csr: Python for Clinical Study Reporting. Zenodo. https://doi.org/10.5281/zenodo.19621900
+
+**BibTeX:**
+```bibtex
+@software{yan_py4csr,
+  author       = {Jaime Yan},
+  title        = {py4csr: Python for Clinical Study Reporting},
+  year         = {2026},
+  publisher    = {Zenodo},
+  doi          = {10.5281/zenodo.19621900},
+  url          = {[https://doi.org/10.5281/zenodo.19621900](https://doi.org/10.5281/zenodo.19621900)}
+}
+
 ## 🙏 Acknowledgments
 
 - Inspired by the clinical reporting needs of the pharmaceutical industry
