@@ -117,6 +117,8 @@ Full inventory, including what becomes the v2 core and what is legacy: [ARCHITEC
 
 ## Roadmap
 
+The live, detailed version of this roadmap is a public GitHub Project: [py4csr Roadmap](https://github.com/users/yanmingyu92/projects/1) — including what's in progress now and where contributions are most welcome.
+
 1. **ARD-first table engine v2** — a `tbl_summary()`-style API distilled from the existing `add_var`/`add_catvar` semantics, with a documented, versioned Analysis Results Dataset schema as the output contract.
 2. **External rendering backends** — render tables via great_tables (HTML/Word) and rtflite (RTF); keep the in-repo formatters for backward compatibility during the transition.
 3. **Reproducibility evidence** — end-to-end CDISC Pilot reproduction with snapshot tests in CI, so results are continuously checked, not just claimed.
