@@ -7,10 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Default p-value tests now match gtsummary's `add_p()` defaults.** Continuous
+  variables use Wilcoxon rank-sum (2 groups, scipy `mannwhitneyu` two-sided) or
+  Kruskal-Wallis (>2 groups) instead of ANOVA; categorical variables use Pearson
+  chi-square without continuity correction, switching to Fisher's exact test when
+  any expected cell count < 5. The old behavior remains available via explicit
+  `test="anova"` / `test="ttest"` / `test="chisq"` options on `add_var()` /
+  `add_catvar()`. The test actually used per variable is recorded in
+  `ClinicalSession.p_value_tests` and reflected in the output methodology footnote.
+- Unknown keywords in `stats=` strings now raise a clear `ValueError` listing the
+  valid statistics (previously silently produced "N/A" cells).
+- Missing (NaN) values in the treatment variable now raise a clear, actionable
+  `ValueError` instead of crashing or silently contaminating group/Total columns.
+- Empty analysis frames (e.g. a `where` clause that removes all rows) now raise a
+  clear `ValueError` instead of returning empty results.
+
+### Added
+- `ClinicalStatisticalEngine.perform_wilcoxon`, `perform_kruskal`, `perform_ttest`,
+  and `perform_continuous_test` / `perform_categorical_test` dispatchers with
+  explicit, documented test selection (`test="auto"` follows gtsummary behavior).
+- Fisher's exact test supports RxC tables via a fixed-seed Monte Carlo
+  (deterministic), in addition to analytic 2x2.
+- `py4csr.tbl_summary(data, by=..., include=..., statistic=..., label=...,
+  where=..., total=..., type=..., test=...)` convenience API (ARCHITECTURE.md §6
+  sketch), returning a `TblSummaryResult` with `.ard` (long-format results),
+  `.to_table()`, `.preview()`, `.p_values` and `.p_value_tests`.
+
+### Fixed
+- pandas 3.0 compatibility: `fillna(method="ffill")` replaced with `.ffill()` in
+  `data/preprocessing.py`; `apply_cdisc_formats` keeps USUBJID as object-dtype
+  strings (`astype(str)` yields StringDtype in pandas >= 3); `read_sas`/`read_xpt`
+  now raise `FileNotFoundError` for missing files before checking the optional
+  `pyreadstat` dependency.
+- N statistic for empty/all-missing groups now reports 0 instead of a blank cell.
+- Performance: `generate()` on a 100k-row × 10-variable ADSL is ~40% faster
+  (1.5s → 0.9s) after vectorizing categorical counting (single groupby pass
+  instead of per-cell boolean scans), grouping continuous stats once per variable,
+  and removing per-variable full-frame copies in p-value collection.
+
+### Validation
+- Cross-validation harness (`validation/compare_gtsummary.py` in the development
+  workspace) against gtsummary's `trial` dataset: **99/99 compared cells match
+  the independent reference (100%), including Wilcoxon/chi-square p-values**, and
+  40/40 published gtsummary vignette values are reproduced.
+
 ### In Progress
 - JSS manuscript preparation
 - Additional example notebooks
-- Performance optimizations
 
 ---
 
