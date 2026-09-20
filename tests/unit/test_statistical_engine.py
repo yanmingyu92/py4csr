@@ -98,19 +98,17 @@ class TestCalculateContinuousStats:
         assert 'Median' in statistics
     
     def test_continuous_stats_empty_data(self):
-        """Test with empty dataset."""
+        """Test with empty dataset: now raises a clear, actionable error."""
         engine = ClinicalStatisticalEngine()
         empty_df = pd.DataFrame(columns=['AGE', 'TRT01P'])
         
-        results = engine.calculate_continuous_stats(
-            data=empty_df,
-            variable="AGE",
-            treatment_var="TRT01P",
-            stats_spec="n mean"
-        )
-        
-        # Should return empty or handle gracefully
-        assert isinstance(results, pd.DataFrame)
+        with pytest.raises(ValueError, match="No rows remain"):
+            engine.calculate_continuous_stats(
+                data=empty_df,
+                variable="AGE",
+                treatment_var="TRT01P",
+                stats_spec="n mean"
+            )
 
 
 class TestCalculateCategoricalStats:

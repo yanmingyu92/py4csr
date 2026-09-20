@@ -5,6 +5,7 @@ This module implements the core statistical calculations for continuous and
 categorical variables, equivalent to the SAS statistical processing engines.
 """
 
+import re
 import warnings
 from typing import Any, Dict, List, Optional, Union
 
@@ -36,6 +37,35 @@ class ClinicalStatisticalEngine:
             "bmibl": 1,
             "default": 1,
         }
+
+    @staticmethod
+    def _validate_analysis_frame(
+        data: pd.DataFrame, treatment_var: str, context: str = ""
+    ) -> None:
+        """Validate the treatment grouping before statistics are computed.
+
+        Raises clear, actionable errors instead of downstream stack-trace
+        crashes (KeyError on missing column, TypeError when sorting values
+        with NaN, or silently wrong Totals that include unassigned rows).
+        """
+        if treatment_var not in data.columns:
+            raise ValueError(
+                f"Treatment variable '{treatment_var}' not found in dataset"
+                + (f" (analyzing '{context}')" if context else "")
+            )
+        if len(data) == 0:
+            raise ValueError(
+                "No rows remain after filtering"
+                + (f" for variable '{context}'" if context else "")
+                + "; check the where clause"
+            )
+        n_missing = int(data[treatment_var].isna().sum())
+        if n_missing > 0:
+            raise ValueError(
+                f"Treatment variable '{treatment_var}' has {n_missing} missing "
+                "value(s); filter or impute them before generating the table "
+                "(rows without a treatment cannot be assigned to a group)"
+            )
 
     def calculate_continuous_stats(
         self,
@@ -69,8 +99,10 @@ class ClinicalStatisticalEngine:
         pd.DataFrame
             Statistical results with formatted values
         """
-        # Apply additional filter if specified
-        filtered_data = data.copy()
+        # Apply additional filter if specified. Avoid a full deep copy:
+        # query() already returns a new frame, and the caller's data is never
+        # mutated (the numeric conversion below goes through assign()).
+        filtered_data = data
         if where_clause and where_clause.strip():
             try:
                 filtered_data = filtered_data.query(where_clause)
@@ -82,9 +114,11 @@ class ClinicalStatisticalEngine:
             raise ValueError(f"Variable '{variable}' not found in dataset")
 
         # Convert to numeric, coercing errors to NaN
-        filtered_data[variable] = pd.to_numeric(
-            filtered_data[variable], errors="coerce"
+        filtered_data = filtered_data.assign(
+            **{variable: pd.to_numeric(filtered_data[variable], errors="coerce")}
         )
+
+        self._validate_analysis_frame(filtered_data, treatment_var, variable)
 
         # Parse statistics specification
         requested_stats = self._parse_stats_spec(stats_spec)
@@ -94,12 +128,13 @@ class ClinicalStatisticalEngine:
 
         results = []
 
-        # Calculate for each treatment group
+        # Calculate for each treatment group. Group once instead of
+        # boolean-filtering the full frame per group (O(groups) full scans).
         treatment_groups = sorted(filtered_data[treatment_var].unique())
+        grouped = dict(tuple(filtered_data.groupby(treatment_var, sort=False)))
 
         for treatment in treatment_groups:
-            trt_data = filtered_data[filtered_data[treatment_var] == treatment]
-            var_data = trt_data[variable].dropna()
+            var_data = grouped[treatment][variable].dropna()
 
             # Calculate each requested statistic
             for stat_name in requested_stats:
@@ -200,6 +235,8 @@ class ClinicalStatisticalEngine:
 
         # Parse statistics specification
         requested_stats = self._parse_categorical_stats_spec(stats_spec)
+
+        self._validate_analysis_frame(filtered_data, treatment_var, row_variable)
 
         results = []
 
@@ -503,8 +540,10 @@ class ClinicalStatisticalEngine:
         pd.DataFrame
             Statistical results with formatted values
         """
-        # Apply additional filter if specified
-        filtered_data = data.copy()
+        # Apply additional filter if specified. Avoid a full deep copy:
+        # query() already returns a new frame and this method never mutates
+        # the input data.
+        filtered_data = data
         if where_clause and where_clause.strip():
             try:
                 filtered_data = filtered_data.query(where_clause)
@@ -514,6 +553,8 @@ class ClinicalStatisticalEngine:
         # Ensure variable exists
         if variable not in filtered_data.columns:
             raise ValueError(f"Variable '{variable}' not found in dataset")
+
+        self._validate_analysis_frame(filtered_data, treatment_var, variable)
 
         # Use decode variable if specified and exists
         if decode_var and decode_var in filtered_data.columns:
@@ -540,25 +581,44 @@ class ClinicalStatisticalEngine:
         # Apply proper case formatting to categories
         categories = [self._format_category_name(cat) for cat in categories]
 
+        # Map each formatted category back to its original value — computed
+        # once, instead of a linear scan per (treatment, category) cell
+        original_for = {}
+        for orig_val in filtered_data[category_var].dropna().unique():
+            formatted_val = self._format_category_name(str(orig_val))
+            if formatted_val not in original_for:
+                original_for[formatted_val] = orig_val
+
+        # Vectorized counts: a single groupby pass over the frame instead of
+        # O(treatment groups x categories) full-frame boolean-filter scans.
+        # Missing values are counted separately (groupby drops NaN keys).
+        count_by_trt_cat = filtered_data.groupby(
+            [treatment_var, category_var], sort=False, observed=True
+        ).size()
+        missing_by_trt = (
+            filtered_data[filtered_data[category_var].isna()]
+            .groupby(treatment_var, sort=False, observed=True)
+            .size()
+        )
+        n_by_trt = filtered_data.groupby(
+            treatment_var, sort=False, observed=True
+        ).size()
+        count_by_cat_total = filtered_data[category_var].value_counts()
+        missing_total = int(filtered_data[category_var].isna().sum())
+        all_total_n = len(filtered_data)
+
         # Calculate for each treatment and category combination
         for treatment in treatment_groups:
-            trt_data = filtered_data[filtered_data[treatment_var] == treatment]
-
-            # Calculate denominator (total subjects in treatment group)
-            total_n = len(trt_data)
+            # Denominator (total subjects in treatment group)
+            total_n = int(n_by_trt.get(treatment, 0))
 
             for category in categories:
                 # Count subjects in this category
                 if category == "Missing":
-                    cat_data = trt_data[trt_data[category_var].isna()]
+                    category_n = int(missing_by_trt.get(treatment, 0))
                 else:
-                    # Match against original category (before formatting)
-                    original_cat = self._get_original_category(
-                        category, filtered_data[category_var]
-                    )
-                    cat_data = trt_data[trt_data[category_var] == original_cat]
-
-                category_n = len(cat_data)
+                    original_cat = original_for.get(category, category)
+                    category_n = int(count_by_trt_cat.get((treatment, original_cat), 0))
 
                 # Calculate percentage
                 if total_n > 0:
@@ -586,20 +646,13 @@ class ClinicalStatisticalEngine:
                     )
 
         # Add Total column - statistics across all treatment groups
-        all_total_n = len(filtered_data)
-
         for category in categories:
             # Count subjects in this category across all treatments
             if category == "Missing":
-                cat_data = filtered_data[filtered_data[category_var].isna()]
+                category_n = missing_total
             else:
-                # Match against original category (before formatting)
-                original_cat = self._get_original_category(
-                    category, filtered_data[category_var]
-                )
-                cat_data = filtered_data[filtered_data[category_var] == original_cat]
-
-            category_n = len(cat_data)
+                original_cat = original_for.get(category, category)
+                category_n = int(count_by_cat_total.get(original_cat, 0))
 
             # Calculate percentage
             if all_total_n > 0:
@@ -658,17 +711,21 @@ class ClinicalStatisticalEngine:
                 parsed_stats.append(stat_map[part])
             elif "+" in part:
                 # Handle combined statistics like mean+sd
-                if part in stat_map:
-                    parsed_stats.append(stat_map[part])
-                else:
-                    # Split and add individually
-                    sub_parts = part.split("+")
-                    for sub_part in sub_parts:
-                        if sub_part in stat_map:
-                            parsed_stats.append(stat_map[sub_part])
+                sub_parts = part.split("+")
+                for sub_part in sub_parts:
+                    if sub_part in stat_map:
+                        parsed_stats.append(stat_map[sub_part])
+                    else:
+                        raise ValueError(
+                            f"Unknown statistic '{sub_part}' in stats spec "
+                            f"'{stats_spec}'. Valid statistics: "
+                            + ", ".join(sorted(stat_map))
+                        )
             else:
-                # Add as-is if not found in mapping
-                parsed_stats.append(part.title())
+                raise ValueError(
+                    f"Unknown statistic '{part}' in stats spec '{stats_spec}'. "
+                    "Valid statistics: " + ", ".join(sorted(stat_map))
+                )
 
         # Default statistics if none specified
         if not parsed_stats:
@@ -694,7 +751,11 @@ class ClinicalStatisticalEngine:
             if part in stat_map:
                 parsed_stats.append(stat_map[part])
             else:
-                parsed_stats.append("n_pct")  # Default
+                raise ValueError(
+                    f"Unknown categorical statistic '{part}' in stats spec "
+                    f"'{stats_spec}'. Valid statistics: "
+                    + ", ".join(sorted(stat_map))
+                )
 
         if not parsed_stats:
             parsed_stats = ["n_pct"]
@@ -705,14 +766,17 @@ class ClinicalStatisticalEngine:
         self, data: pd.Series, stat_name: str, decimals: int
     ) -> Dict[str, Any]:
         """Calculate a single continuous statistic."""
-        if len(data) == 0:
-            return {"name": stat_name, "value": None, "formatted": ""}
-
+        # N is defined even for empty groups (0 observations), unlike
+        # moment/quantile statistics which are undefined on empty data
         if stat_name == "N":
             value = len(data)
             formatted = str(value)
+            return {"name": stat_name, "value": value, "formatted": formatted}
 
-        elif stat_name == "Mean":
+        if len(data) == 0:
+            return {"name": stat_name, "value": None, "formatted": ""}
+
+        if stat_name == "Mean":
             value = data.mean()
             formatted = f"{value:.{decimals}f}"
 
@@ -731,16 +795,17 @@ class ClinicalStatisticalEngine:
             formatted = f"{value:.{decimals}f}"
 
         elif stat_name == "Q1":
-            value = data.quantile(0.25)
+            # R/gtsummary and SAS PCTLDEF=5 convention: quantile type 2
+            value = np.percentile(data, 25, method="averaged_inverted_cdf")
             formatted = f"{value:.{decimals}f}"
 
         elif stat_name == "Q3":
-            value = data.quantile(0.75)
+            value = np.percentile(data, 75, method="averaged_inverted_cdf")
             formatted = f"{value:.{decimals}f}"
 
         elif stat_name in ["Q1, Q3", "Q1Q3"]:
-            q1 = data.quantile(0.25)
-            q3 = data.quantile(0.75)
+            q1 = np.percentile(data, 25, method="averaged_inverted_cdf")
+            q3 = np.percentile(data, 75, method="averaged_inverted_cdf")
             value = (q1, q3)
             formatted = f"{q1:.{decimals}f}, {q3:.{decimals}f}"
 
@@ -807,6 +872,14 @@ class ClinicalStatisticalEngine:
         # Check if it's a known race category
         if category_str.upper() in race_mappings:
             return race_mappings[category_str.upper()]
+
+        # Preserve Roman-numeral and alphanumeric codes (e.g. "II", "III",
+        # "T1") instead of title-casing them into "Ii"/"Iii".
+        if re.fullmatch(r"[IVXLCDM]+", category_str) or (
+            any(c.isdigit() for c in category_str)
+            and not any(c.islower() for c in category_str)
+        ):
+            return category_str
 
         # For other categories, use title case with some adjustments
         formatted = category_str.title()
@@ -920,8 +993,13 @@ class ClinicalStatisticalEngine:
             if contingency_table.size == 0:
                 return {"chi2": None, "p_value": None, "error": "No valid data"}
 
-            # Perform chi-square test
-            chi2, p_value, dof, expected = stats.chi2_contingency(contingency_table)
+            # Perform chi-square test. Use Pearson chi-square WITHOUT Yates
+            # continuity correction, matching gtsummary's default
+            # ("Pearson's Chi-squared test", chisq.test correct=FALSE) and
+            # SAS PROC FREQ's Pearson Chi-Square statistic.
+            chi2, p_value, dof, expected = stats.chi2_contingency(
+                contingency_table, correction=False
+            )
 
             return {
                 "chi2": chi2,
@@ -932,6 +1010,315 @@ class ClinicalStatisticalEngine:
             }
         except Exception as e:
             return {"chi2": None, "p_value": None, "error": str(e)}
+
+    def perform_wilcoxon(
+        self, data: pd.DataFrame, variable: str, treatment_var: str
+    ) -> Dict[str, Any]:
+        """
+        Perform Wilcoxon rank-sum (Mann-Whitney U) test, two-sided.
+
+        This is the gtsummary default test for a continuous variable across
+        a 2-level grouping variable (R ``wilcox.test``).
+
+        Parameters
+        ----------
+        data : pd.DataFrame
+            Input dataset
+        variable : str
+            Continuous variable to test
+        treatment_var : str
+            Treatment grouping variable (must have exactly 2 groups)
+
+        Returns
+        -------
+        dict
+            Results including U statistic and p-value
+        """
+        clean_data = data[[variable, treatment_var]].dropna()
+
+        if len(clean_data) == 0:
+            return {"statistic": None, "p_value": None, "error": "No valid data"}
+
+        groups = [
+            group[variable].values for name, group in clean_data.groupby(treatment_var)
+        ]
+        groups = [g for g in groups if len(g) > 0]
+
+        if len(groups) != 2:
+            return {
+                "statistic": None,
+                "p_value": None,
+                "error": f"Wilcoxon rank-sum requires exactly 2 groups, got {len(groups)}",
+            }
+
+        try:
+            u_stat, p_value = stats.mannwhitneyu(
+                groups[0], groups[1], alternative="two-sided"
+            )
+            return {
+                "statistic": u_stat,
+                "p_value": p_value,
+                "error": None,
+                "test": "Wilcoxon rank-sum test",
+                "formatted_p": f"{p_value:.4f}" if p_value >= 0.0001 else "<0.0001",
+            }
+        except Exception as e:
+            return {"statistic": None, "p_value": None, "error": str(e)}
+
+    def perform_kruskal(
+        self, data: pd.DataFrame, variable: str, treatment_var: str
+    ) -> Dict[str, Any]:
+        """
+        Perform Kruskal-Wallis test for continuous variable by treatment.
+
+        This is the gtsummary default test for a continuous variable across
+        a grouping variable with more than 2 levels (R ``kruskal.test``).
+
+        Parameters
+        ----------
+        data : pd.DataFrame
+            Input dataset
+        variable : str
+            Continuous variable to test
+        treatment_var : str
+            Treatment grouping variable
+
+        Returns
+        -------
+        dict
+            Results including H statistic and p-value
+        """
+        clean_data = data[[variable, treatment_var]].dropna()
+
+        if len(clean_data) == 0:
+            return {"statistic": None, "p_value": None, "error": "No valid data"}
+
+        groups = [
+            group[variable].values for name, group in clean_data.groupby(treatment_var)
+        ]
+        groups = [g for g in groups if len(g) > 0]
+
+        if len(groups) < 2:
+            return {"statistic": None, "p_value": None, "error": "Less than 2 groups"}
+
+        try:
+            h_stat, p_value = stats.kruskal(*groups)
+            return {
+                "statistic": h_stat,
+                "p_value": p_value,
+                "error": None,
+                "test": "Kruskal-Wallis test",
+                "formatted_p": f"{p_value:.4f}" if p_value >= 0.0001 else "<0.0001",
+            }
+        except Exception as e:
+            return {"statistic": None, "p_value": None, "error": str(e)}
+
+    def perform_ttest(
+        self, data: pd.DataFrame, variable: str, treatment_var: str
+    ) -> Dict[str, Any]:
+        """
+        Perform pooled two-sample t-test (2 groups only).
+
+        Parameters
+        ----------
+        data : pd.DataFrame
+            Input dataset
+        variable : str
+            Continuous variable to test
+        treatment_var : str
+            Treatment grouping variable (must have exactly 2 groups)
+
+        Returns
+        -------
+        dict
+            Results including t statistic and p-value
+        """
+        clean_data = data[[variable, treatment_var]].dropna()
+
+        if len(clean_data) == 0:
+            return {"statistic": None, "p_value": None, "error": "No valid data"}
+
+        groups = [
+            group[variable].values for name, group in clean_data.groupby(treatment_var)
+        ]
+        groups = [g for g in groups if len(g) > 0]
+
+        if len(groups) != 2:
+            return {
+                "statistic": None,
+                "p_value": None,
+                "error": f"t-test requires exactly 2 groups, got {len(groups)}",
+            }
+
+        try:
+            t_stat, p_value = stats.ttest_ind(groups[0], groups[1], equal_var=True)
+            return {
+                "statistic": t_stat,
+                "p_value": p_value,
+                "error": None,
+                "test": "Two-sample t-test",
+                "formatted_p": f"{p_value:.4f}" if p_value >= 0.0001 else "<0.0001",
+            }
+        except Exception as e:
+            return {"statistic": None, "p_value": None, "error": str(e)}
+
+    def perform_categorical_test(
+        self,
+        data: pd.DataFrame,
+        variable: str,
+        treatment_var: str,
+        test: str = "auto",
+    ) -> Dict[str, Any]:
+        """
+        Perform a statistical test for a categorical variable by treatment.
+
+        With the default ``test="auto"``, test selection follows gtsummary's
+        ``add_p()`` behavior: Pearson's chi-squared test without continuity
+        correction is used, switching to Fisher's exact test when any expected
+        cell count is below 5. For 2x2 tables Fisher's exact test is analytic;
+        for larger tables it uses a Monte Carlo estimate with a fixed seed for
+        reproducibility.
+
+        Parameters
+        ----------
+        data : pd.DataFrame
+            Input dataset
+        variable : str
+            Categorical variable to test
+        treatment_var : str
+            Treatment grouping variable
+        test : str
+            Test to perform: "auto" (gtsummary default behavior), "chisq"
+            (Pearson chi-square, no continuity correction) or "fisher"
+            (Fisher's exact test)
+
+        Returns
+        -------
+        dict
+            Test results including the test name actually used
+        """
+        contingency_table = pd.crosstab(data[variable], data[treatment_var])
+
+        if contingency_table.size == 0 or min(contingency_table.shape) < 2:
+            return {
+                "statistic": None,
+                "p_value": None,
+                "error": "No valid data or less than 2 levels",
+            }
+
+        test = (test or "auto").lower()
+
+        try:
+            if test == "auto":
+                # gtsummary default: Pearson chi-square (no Yates), switching
+                # to Fisher's exact when any expected count < 5.
+                expected = stats.contingency.expected_freq(contingency_table)
+                test = "fisher" if (expected < 5).any() else "chisq"
+
+            if test == "chisq":
+                chi2, p_value, dof, expected = stats.chi2_contingency(
+                    contingency_table, correction=False
+                )
+                return {
+                    "statistic": chi2,
+                    "p_value": p_value,
+                    "dof": dof,
+                    "error": None,
+                    "test": "Pearson's Chi-squared test",
+                    "formatted_p": f"{p_value:.4f}" if p_value >= 0.0001 else "<0.0001",
+                }
+            elif test == "fisher":
+                if contingency_table.shape == (2, 2):
+                    odds_ratio, p_value = stats.fisher_exact(contingency_table)
+                    statistic: Any = odds_ratio
+                else:
+                    # Fisher-Freeman-Halton extension via Monte Carlo with a
+                    # fixed seed for reproducibility (R fisher.test uses
+                    # simulate.p.value for large tables).
+                    method = stats.MonteCarloMethod(n_resamples=10000, rng=20240101)
+                    result = stats.fisher_exact(
+                        contingency_table.to_numpy(), method=method
+                    )
+                    p_value = result.pvalue
+                    statistic = result.statistic
+                return {
+                    "statistic": statistic,
+                    "p_value": float(p_value),
+                    "error": None,
+                    "test": "Fisher's exact test",
+                    "formatted_p": f"{p_value:.4f}" if p_value >= 0.0001 else "<0.0001",
+                }
+            else:
+                return {
+                    "statistic": None,
+                    "p_value": None,
+                    "error": (
+                        f"Unknown categorical test '{test}'. "
+                        "Use 'auto', 'chisq' or 'fisher'."
+                    ),
+                }
+        except Exception as e:
+            return {"statistic": None, "p_value": None, "error": str(e)}
+
+    def perform_continuous_test(
+        self,
+        data: pd.DataFrame,
+        variable: str,
+        treatment_var: str,
+        test: str = "auto",
+    ) -> Dict[str, Any]:
+        """
+        Perform a statistical test for a continuous variable by treatment.
+
+        With the default ``test="auto"``, test selection follows gtsummary's
+        ``add_p()`` behavior: Wilcoxon rank-sum test for 2 groups and
+        Kruskal-Wallis test for more than 2 groups.
+
+        Parameters
+        ----------
+        data : pd.DataFrame
+            Input dataset
+        variable : str
+            Continuous variable to test
+        treatment_var : str
+            Treatment grouping variable
+        test : str
+            Test to perform: "auto" (gtsummary default behavior), "wilcoxon"
+            (2 groups only), "kruskal", "anova" or "ttest" (2 groups only)
+
+        Returns
+        -------
+        dict
+            Test results including the test name actually used
+        """
+        test = (test or "auto").lower()
+
+        if test == "auto":
+            n_groups = data[[variable, treatment_var]].dropna()[
+                treatment_var
+            ].nunique()
+            test = "wilcoxon" if n_groups <= 2 else "kruskal"
+
+        if test == "wilcoxon":
+            return self.perform_wilcoxon(data, variable, treatment_var)
+        elif test == "kruskal":
+            return self.perform_kruskal(data, variable, treatment_var)
+        elif test == "ttest":
+            return self.perform_ttest(data, variable, treatment_var)
+        elif test == "anova":
+            result = self.perform_anova(data, variable, treatment_var)
+            result["statistic"] = result.pop("f_stat", None)
+            result["test"] = "One-way ANOVA"
+            return result
+        else:
+            return {
+                "statistic": None,
+                "p_value": None,
+                "error": (
+                    f"Unknown continuous test '{test}'. "
+                    "Use 'auto', 'wilcoxon', 'kruskal', 'ttest' or 'anova'."
+                ),
+            }
 
     def perform_fisher_exact(
         self, data: pd.DataFrame, variable: str, treatment_var: str
@@ -1017,6 +1404,8 @@ class ClinicalStatisticalEngine:
             except Exception as e:
                 warnings.warn(f"Where clause failed: {e}")
                 filtered_data = data.copy()
+
+        self._validate_analysis_frame(data, treatment_var)
 
         # Parse statistics specification
         requested_stats = stats_spec.lower().split()

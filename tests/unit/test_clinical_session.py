@@ -5,6 +5,7 @@ Tests the main clinical reporting session functionality.
 """
 
 import pandas as pd
+import numpy as np
 import pytest
 from unittest.mock import Mock, patch
 import warnings
@@ -330,6 +331,58 @@ class TestGenerate:
 
         with pytest.raises(ValueError, match="No treatment variable defined"):
             session.generate()
+
+
+class TestPValueTestSelection:
+    """Test gtsummary-style p-value test selection in ClinicalSession."""
+
+    def _build_session(self, sample_adsl, cont_test="auto", cat_test="auto"):
+        session = ClinicalSession(uri="test_pval")
+        session.define_report(dataset=sample_adsl, subjid="USUBJID")
+        session.add_trt(name="TRT01PN", decode="TRT01P")
+        session.add_var(name="AGE", label="Age (years)", stats="n mean", test=cont_test)
+        session.add_catvar(name="SEX", label="Sex, n (%)", stats="npct", test=cat_test)
+        session.generate()
+        return session
+
+    def test_continuous_default_is_wilcoxon_or_kruskal(self, sample_adsl):
+        """Continuous default: Wilcoxon (2 groups) / Kruskal-Wallis (>2)."""
+        # sample_adsl TRT01PN has 3 groups -> Kruskal-Wallis
+        session = self._build_session(sample_adsl)
+        assert session.p_value_tests["Age (years)"] == "Kruskal-Wallis test"
+        assert session.p_values["Age (years)"] != "N/A"
+
+        # subset to 2 groups -> Wilcoxon rank-sum
+        adsl2 = sample_adsl[sample_adsl["TRT01PN"].isin([0, 1])].copy()
+        session2 = self._build_session(adsl2)
+        assert session2.p_value_tests["Age (years)"] == "Wilcoxon rank-sum test"
+
+    def test_categorical_default_is_chisq(self, sample_adsl):
+        """Categorical default: Pearson chi-square (no continuity correction)."""
+        # replicate so all expected cell counts are >= 5 (else Fisher kicks in)
+        big_adsl = pd.concat([sample_adsl] * 10, ignore_index=True)
+        session = self._build_session(big_adsl)
+        assert session.p_value_tests["Sex, n (%)"] == "Pearson's Chi-squared test"
+
+    def test_explicit_test_override(self, sample_adsl):
+        """add_var(test='anova') / add_catvar(test='fisher') are honored."""
+        session = self._build_session(sample_adsl, cont_test="anova", cat_test="fisher")
+        assert session.p_value_tests["Age (years)"] == "One-way ANOVA"
+        assert session.p_value_tests["Sex, n (%)"] == "Fisher's exact test"
+
+    def test_unknown_test_gives_na_and_warning(self, sample_adsl):
+        """Unknown test name -> p-value N/A with a clear warning, not a crash."""
+        with pytest.warns(UserWarning, match="Unknown continuous test"):
+            session = self._build_session(sample_adsl, cont_test="bogus")
+        assert session.p_values["Age (years)"] == "N/A"
+
+    def test_methodology_footnote_reflects_tests(self, sample_adsl):
+        """The methodology footnote states the tests actually used."""
+        big_adsl = pd.concat([sample_adsl] * 10, ignore_index=True)
+        session = self._build_session(big_adsl)
+        footnote = session._methodology_footnote()
+        assert "Kruskal-Wallis test" in footnote
+        assert "Pearson's Chi-squared test" in footnote
 
 
 class TestFinalize:
@@ -708,3 +761,56 @@ class TestEdgeCases:
 
         assert len(session.groups) > 0
 
+
+
+class TestGenerateEdgeCases:
+    """Session-level edge cases for generate()."""
+
+    def test_generate_nan_treatment_raises_clear_error(self, sample_adsl):
+        """NaN in treatment variable -> fail fast with actionable message."""
+        adsl = sample_adsl.copy()
+        adsl.loc[0, "TRT01PN"] = np.nan
+
+        session = ClinicalSession(uri="test_nan_trt")
+        session.define_report(dataset=adsl, subjid="USUBJID")
+        session.add_trt(name="TRT01PN", decode="TRT01P")
+        session.add_var(name="AGE", label="Age (years)", stats="n mean")
+
+        with pytest.raises(ValueError, match="missing"):
+            session.generate()
+
+    def test_generate_missing_treatment_column_raises(self, sample_adsl):
+        """Treatment column not in dataset -> ValueError, not a KeyError."""
+        session = ClinicalSession(uri="test_no_trt_col")
+        session.define_report(dataset=sample_adsl, subjid="USUBJID")
+        session.add_trt(name="NONEXISTENT_TRT")
+        session.add_var(name="AGE", label="Age (years)", stats="n mean")
+
+        with pytest.raises(ValueError, match="not found"):
+            session.generate()
+
+    def test_generate_single_level_categorical(self, sample_adsl):
+        """Single-level categorical generates a table; p-value is N/A."""
+        adsl = sample_adsl.copy()
+        adsl["ALLONE"] = "ONLY"
+
+        session = ClinicalSession(uri="test_single_level")
+        session.define_report(dataset=adsl, subjid="USUBJID")
+        session.add_trt(name="TRT01PN", decode="TRT01P")
+        session.add_catvar(name="ALLONE", label="Constant, n (%)", stats="npct")
+        session.generate()
+
+        assert session.generated_table is not None
+        assert session.p_values["Constant, n (%)"] == "N/A"
+
+    def test_generate_unknown_stat_keyword_skips_with_clear_warning(
+        self, sample_adsl
+    ):
+        """Unknown stats= keyword -> clear warning naming the bad keyword."""
+        session = ClinicalSession(uri="test_bad_stat")
+        session.define_report(dataset=sample_adsl, subjid="USUBJID")
+        session.add_trt(name="TRT01PN", decode="TRT01P")
+        session.add_var(name="AGE", label="Age (years)", stats="n bogus")
+
+        with pytest.warns(UserWarning, match="Unknown statistic 'bogus'"):
+            session.generate()

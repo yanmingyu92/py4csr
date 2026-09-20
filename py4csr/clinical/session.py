@@ -73,6 +73,8 @@ class ClinicalSession:
         self.generated_table = None
         self.treatment_info = {}
         self.p_values = {}
+        # Statistical test actually used per variable label (for footnotes)
+        self.p_value_tests = {}
 
         print(f"[CHECK] Clinical session initialized: {self.uri}")
 
@@ -417,6 +419,7 @@ class ClinicalSession:
         statlabfmt: str = "$__rrglf.",
         pvfmt: str = "__rrgpf.",
         statdecinfmt: str = "__rrgdf.",
+        test: str = "auto",
     ):
         """
         Add continuous variable for analysis.
@@ -429,6 +432,10 @@ class ClinicalSession:
             Display label
         stats : str
             Statistics to calculate (space-separated)
+        test : str
+            Statistical test for the p-value: "auto" (gtsummary default:
+            Wilcoxon rank-sum for 2 groups, Kruskal-Wallis for >2 groups),
+            "wilcoxon", "kruskal", "ttest" or "anova"
         where : str
             Additional filter condition
         indent : int
@@ -501,6 +508,7 @@ class ClinicalSession:
             "statlabfmt": statlabfmt,
             "pvfmt": pvfmt,
             "statdecinfmt": statdecinfmt,
+            "test": test,
         }
 
         self.variables.append(variable)
@@ -563,6 +571,7 @@ class ClinicalSession:
         DENOMINClTRT: str = "Y",
         show0cnt: str = "y",
         noshow0cntvals: str = "",
+        test: str = "auto",
     ):
         """
         Add categorical variable for analysis.
@@ -575,6 +584,11 @@ class ClinicalSession:
             Display label
         stats : str
             Statistics to calculate
+        test : str
+            Statistical test for the p-value: "auto" (gtsummary default:
+            Pearson chi-square without continuity correction, switching to
+            Fisher's exact test when any expected cell count < 5), "chisq"
+            or "fisher"
         where : str
             Additional filter condition
         indent : int
@@ -725,6 +739,7 @@ class ClinicalSession:
             "DENOMINClTRT": DENOMINClTRT,
             "show0cnt": show0cnt,
             "noshow0cntvals": noshow0cntvals,
+            "test": test,
         }
 
         self.variables.append(variable)
@@ -898,6 +913,13 @@ class ClinicalSession:
         decode_var = self.treatments["decode"]
 
         self._collect_treatment_info(filtered_data, treatment_var, decode_var)
+
+        # Fail fast with a clear, actionable error if the treatment grouping is
+        # unusable (missing column, empty data, or NaN treatment values would
+        # otherwise produce silently wrong group/Total columns)
+        ClinicalStatisticalEngine._validate_analysis_frame(
+            filtered_data, treatment_var
+        )
 
         # Check if this is a shift table (has grouping variable with across='Y')
         across_group = self._get_across_grouping_variable()
@@ -1207,11 +1229,20 @@ class ClinicalSession:
         data: pd.DataFrame,
         treatment_var: str,
     ):
-        """Collect p-values for variables using simple tests.
+        """Collect p-values for variables.
 
-        - Continuous: one-way ANOVA across treatment groups (scipy.stats.f_oneway)
-        - Categorical: Pearson chi-square test on contingency table
-        Falls back to "N/A" if required packages are unavailable or data insufficient.
+        Test selection is explicit and recorded per variable in
+        ``self.p_value_tests`` (usable in regulatory footnotes). Defaults
+        follow gtsummary's ``add_p()``:
+
+        - Continuous: Wilcoxon rank-sum (2 groups) / Kruskal-Wallis (>2
+          groups). Alternatives via ``add_var(..., test=)``: "ttest", "anova".
+        - Categorical: Pearson chi-square without continuity correction,
+          switching to Fisher's exact test when any expected cell count < 5.
+          Alternatives via ``add_catvar(..., test=)``: "chisq", "fisher".
+
+        Falls back to "N/A" if required packages are unavailable or data
+        insufficient.
         """
         var_label = variable.get("label", variable.get("name"))
 
@@ -1223,7 +1254,9 @@ class ClinicalSession:
             self.p_values[var_label] = "N/A"
             return
 
-        df = data.copy()
+        # Avoid copying the full frame: query() already returns a new frame,
+        # and the engine test methods only read from the data.
+        df = data
         where = variable.get("where")
         if where:
             try:
@@ -1236,25 +1269,27 @@ class ClinicalSession:
             self.p_values[var_label] = "N/A"
             return
 
-        pval = None
-        try:
-            if variable.get("type") == "continuous":
-                groups = [g[name].dropna().values for _, g in df.groupby(treatment_var)]
-                valid = [arr for arr in groups if len(arr) > 0]
-                if len(valid) >= 2:
-                    _stat, p = _sps.f_oneway(*valid)
-                    pval = float(p)
-            else:
-                ct = _pd.crosstab(df[name], df[treatment_var])
-                if ct.shape[0] >= 2 and ct.shape[1] >= 2:
-                    _chi2, p, _dof, _exp = _sps.chi2_contingency(ct)
-                    pval = float(p)
-        except Exception:
-            pval = None
+        requested_test = variable.get("test", "auto")
 
+        if variable.get("type") == "continuous":
+            result = self.stats_engine.perform_continuous_test(
+                df, name, treatment_var, test=requested_test
+            )
+        else:
+            result = self.stats_engine.perform_categorical_test(
+                df, name, treatment_var, test=requested_test
+            )
+
+        pval = result.get("p_value")
         if pval is None:
             self.p_values[var_label] = "N/A"
+            if result.get("error"):
+                warnings.warn(
+                    f"P-value for '{var_label}' not computed: {result['error']}"
+                )
         else:
+            pval = float(pval)
+            self.p_value_tests[var_label] = result.get("test", requested_test)
             try:
                 self.p_values[var_label] = format_pvalue(pval)
             except Exception:
@@ -1575,6 +1610,17 @@ class ClinicalSession:
         print(f"[CHECK_MARK] Table finalized: {output_file}")
         return self
 
+    def _methodology_footnote(self) -> str:
+        """Build the statistical methodology footnote from tests actually used."""
+        tests = sorted(set(self.p_value_tests.values()))
+        if tests:
+            return "P-values: " + "; ".join(tests)
+        return (
+            "P-values: Wilcoxon rank-sum/Kruskal-Wallis test for continuous "
+            "variables; Pearson's Chi-squared test (Fisher's exact test where "
+            "expected counts < 5) for categorical variables"
+        )
+
     def _save_clinical_rtf(self, output_file: str):
         """Save table as RTF using Enhanced Clinical formatter."""
         formatter = EnhancedClinicalRTFFormatter()
@@ -1591,7 +1637,7 @@ class ClinicalSession:
         display_table = self._prepare_table_for_rtf()
 
         # Add statistical methodology footnote
-        method_footnote = "P-values: ANOVA for continuous variables, Chi-square for categorical variables"
+        method_footnote = self._methodology_footnote()
         if method_footnote not in footnotes:
             footnotes.append(method_footnote)
 
@@ -1644,7 +1690,7 @@ class ClinicalSession:
         display_table = self._prepare_table_for_rtf()
 
         # Add statistical methodology footnote
-        method_footnote = "P-values: ANOVA for continuous variables, Chi-square for categorical variables"
+        method_footnote = self._methodology_footnote()
         if method_footnote not in footnotes:
             footnotes.append(method_footnote)
 

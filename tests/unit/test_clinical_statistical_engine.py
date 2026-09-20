@@ -232,6 +232,140 @@ class TestStatisticalTests:
         assert "p_value" in result
 
 
+class TestGtsummaryTestSelection:
+    """Test gtsummary-style default test selection (Task: p-value parity)."""
+
+    def test_perform_wilcoxon_matches_scipy(self, engine):
+        """Wilcoxon rank-sum for 2 groups matches scipy mannwhitneyu."""
+        from scipy import stats as sps
+
+        rng = np.random.default_rng(42)
+        data = pd.DataFrame({
+            "TRT": ["A"] * 50 + ["B"] * 50,
+            "VAL": np.concatenate([rng.normal(10, 2, 50), rng.normal(11, 2, 50)]),
+        })
+        result = engine.perform_wilcoxon(data, "VAL", "TRT")
+        ref = sps.mannwhitneyu(
+            data.loc[data.TRT == "A", "VAL"],
+            data.loc[data.TRT == "B", "VAL"],
+            alternative="two-sided",
+        )
+        assert result["error"] is None
+        assert result["test"] == "Wilcoxon rank-sum test"
+        assert abs(result["p_value"] - ref.pvalue) < 1e-12
+
+    def test_perform_wilcoxon_requires_two_groups(self, engine, sample_continuous_data):
+        """Wilcoxon with 3 groups returns a clear error, not a crash."""
+        result = engine.perform_wilcoxon(sample_continuous_data, "AGE", "TRT01P")
+        assert result["p_value"] is None
+        assert "2 groups" in result["error"]
+
+    def test_perform_kruskal_matches_scipy(self, engine, sample_continuous_data):
+        """Kruskal-Wallis for 3 groups matches scipy kruskal."""
+        from scipy import stats as sps
+
+        result = engine.perform_kruskal(sample_continuous_data, "AGE", "TRT01P")
+        ref = sps.kruskal(
+            *[g["AGE"].values for _, g in sample_continuous_data.groupby("TRT01P")]
+        )
+        assert result["error"] is None
+        assert result["test"] == "Kruskal-Wallis test"
+        assert abs(result["p_value"] - ref.pvalue) < 1e-12
+
+    def test_perform_ttest(self, engine):
+        """Pooled two-sample t-test for 2 groups."""
+        rng = np.random.default_rng(7)
+        data = pd.DataFrame({
+            "TRT": ["A"] * 30 + ["B"] * 30,
+            "VAL": np.concatenate([rng.normal(0, 1, 30), rng.normal(0.8, 1, 30)]),
+        })
+        result = engine.perform_ttest(data, "VAL", "TRT")
+        assert result["error"] is None
+        assert 0 <= result["p_value"] <= 1
+
+    def test_continuous_test_auto_two_groups_uses_wilcoxon(self, engine):
+        """auto with 2 groups selects Wilcoxon rank-sum (gtsummary default)."""
+        rng = np.random.default_rng(1)
+        data = pd.DataFrame({
+            "TRT": ["A"] * 20 + ["B"] * 20,
+            "VAL": rng.normal(0, 1, 40),
+        })
+        result = engine.perform_continuous_test(data, "VAL", "TRT", test="auto")
+        assert result["test"] == "Wilcoxon rank-sum test"
+        assert result["p_value"] is not None
+
+    def test_continuous_test_auto_multi_groups_uses_kruskal(
+        self, engine, sample_continuous_data
+    ):
+        """auto with >2 groups selects Kruskal-Wallis (gtsummary default)."""
+        result = engine.perform_continuous_test(
+            sample_continuous_data, "AGE", "TRT01P", test="auto"
+        )
+        assert result["test"] == "Kruskal-Wallis test"
+        assert result["p_value"] is not None
+
+    def test_continuous_test_anova_override(self, engine, sample_continuous_data):
+        """test='anova' keeps the pre-existing ANOVA behavior."""
+        result = engine.perform_continuous_test(
+            sample_continuous_data, "AGE", "TRT01P", test="anova"
+        )
+        ref = engine.perform_anova(sample_continuous_data, "AGE", "TRT01P")
+        assert result["test"] == "One-way ANOVA"
+        assert result["p_value"] == ref["p_value"]
+
+    def test_continuous_test_unknown_test(self, engine, sample_continuous_data):
+        """Unknown test name returns a clear, actionable error."""
+        result = engine.perform_continuous_test(
+            sample_continuous_data, "AGE", "TRT01P", test="bogus"
+        )
+        assert result["p_value"] is None
+        assert "Unknown continuous test" in result["error"]
+
+    def test_categorical_test_auto_uses_chisq_when_expected_ok(
+        self, engine, sample_categorical_data
+    ):
+        """auto uses Pearson chi-square when all expected counts >= 5."""
+        result = engine.perform_categorical_test(
+            sample_categorical_data, "SEX", "TRT01P", test="auto"
+        )
+        assert result["test"] == "Pearson's Chi-squared test"
+        assert result["p_value"] is not None
+
+    def test_categorical_test_auto_switches_to_fisher_on_small_expected(self, engine):
+        """auto switches to Fisher exact when any expected count < 5."""
+        data = pd.DataFrame({
+            "TRT": ["A"] * 10 + ["B"] * 10,
+            "RARE": ["Y", "N", "N", "N", "N", "N", "N", "N", "N", "N",
+                     "N", "N", "N", "N", "N", "N", "N", "N", "N", "N"],
+        })
+        result = engine.perform_categorical_test(data, "RARE", "TRT", test="auto")
+        assert result["test"] == "Fisher's exact test"
+        ref = engine.perform_fisher_exact(data, "RARE", "TRT")
+        assert abs(result["p_value"] - ref["p_value"]) < 1e-12
+
+    def test_categorical_test_fisher_override_larger_table(self, engine):
+        """test='fisher' works for RxC tables via fixed-seed Monte Carlo."""
+        data = pd.DataFrame({
+            "TRT": ["A"] * 9 + ["B"] * 9,
+            "CAT": ["x", "y", "z", "x", "y", "z", "x", "y", "y",
+                    "x", "x", "z", "y", "z", "z", "x", "x", "x"],
+        })
+        result = engine.perform_categorical_test(data, "CAT", "TRT", test="fisher")
+        assert result["test"] == "Fisher's exact test"
+        assert result["p_value"] is not None
+        # deterministic across calls (fixed seed)
+        result2 = engine.perform_categorical_test(data, "CAT", "TRT", test="fisher")
+        assert result["p_value"] == result2["p_value"]
+
+    def test_categorical_test_unknown_test(self, engine, sample_categorical_data):
+        """Unknown test name returns a clear, actionable error."""
+        result = engine.perform_categorical_test(
+            sample_categorical_data, "SEX", "TRT01P", test="bogus"
+        )
+        assert result["p_value"] is None
+        assert "Unknown categorical test" in result["error"]
+
+
 class TestCalculateConditionStats:
     """Test calculate_condition_stats method."""
 
@@ -489,3 +623,166 @@ class TestHelperMethods:
         result = engine._format_category_name("FEMALE")
         assert result == "Female"
 
+
+
+class TestEdgeCaseRobustness:
+    """Edge-case robustness for the table engine core.
+
+    Each edge case must either produce a correct result or raise a clear,
+    actionable error (ValueError with a message naming the problem) — never a
+    stack-trace crash (KeyError/TypeError) or silently wrong numbers.
+    """
+
+    # --- all-missing variable -------------------------------------------------
+
+    def test_all_missing_continuous_variable(self, engine):
+        """All-missing continuous variable: N=0 and empty cells, no crash."""
+        data = pd.DataFrame({
+            "TRT": ["A"] * 5 + ["B"] * 5,
+            "VAL": [np.nan] * 10,
+        })
+        result = engine.calculate_continuous_stats(
+            data, "VAL", "TRT", "n mean sd median"
+        )
+        n_rows = result[result["statistic"] == "N"]
+        assert all(n_rows["value"] == 0)
+        # Non-count statistics have no value and empty formatted cell
+        mean_rows = result[result["statistic"] == "Mean"]
+        assert all(mean_rows["value"].isna())
+
+    def test_all_missing_categorical_variable(self, engine):
+        """All-missing categorical variable collapses to a 'Missing' row."""
+        data = pd.DataFrame({
+            "TRT": ["A"] * 5 + ["B"] * 5,
+            "CAT": [None] * 10,
+        })
+        result = engine.calculate_categorical_stats(
+            data, "CAT", "TRT", "npct", show_missing="Y"
+        )
+        assert set(result["category"].unique()) == {"Missing"}
+        assert result[result["treatment"] == "A"]["n"].iloc[0] == 5
+        assert result[result["treatment"] == "Total"]["n"].iloc[0] == 10
+
+    # --- single-level categorical ----------------------------------------------
+
+    def test_single_level_categorical(self, engine):
+        """Single-level categorical variable produces correct 100% rows."""
+        data = pd.DataFrame({
+            "TRT": ["A"] * 4 + ["B"] * 6,
+            "CAT": ["Active"] * 10,
+        })
+        result = engine.calculate_categorical_stats(
+            data, "CAT", "TRT", "npct", show_missing="N"
+        )
+        assert set(result["category"].unique()) == {"Active"}
+        assert result[result["treatment"] == "B"]["percentage"].iloc[0] == 100.0
+
+    def test_single_level_categorical_test_returns_error_not_crash(self, engine):
+        """A 1-level categorical cannot be tested: clear error, no crash."""
+        data = pd.DataFrame({
+            "TRT": ["A"] * 4 + ["B"] * 6,
+            "CAT": ["ONLY"] * 10,
+        })
+        result = engine.perform_categorical_test(data, "CAT", "TRT")
+        assert result["p_value"] is None
+        assert "less than 2 levels" in result["error"]
+
+    # --- zero-count category ----------------------------------------------------
+
+    def test_zero_count_category(self, engine):
+        """Category present in one arm only: 0 (0.0%) in the other arm."""
+        data = pd.DataFrame({
+            "TRT": ["A"] * 4 + ["B"] * 4,
+            "CAT": ["X", "X", "X", "X", "Y", "Y", "Y", "Y"],
+        })
+        result = engine.calculate_categorical_stats(
+            data, "CAT", "TRT", "npct", show_missing="N"
+        )
+        x_in_b = result[
+            (result["treatment"] == "B") & (result["category"] == "X")
+        ]
+        assert x_in_b["n"].iloc[0] == 0
+        assert x_in_b["formatted_value"].iloc[0] == "0 (0.0%)"
+
+    def test_zero_count_category_chisquare(self, engine):
+        """Chi-square still computable when a category is absent in one arm."""
+        data = pd.DataFrame({
+            "TRT": ["A"] * 4 + ["B"] * 4,
+            "CAT": ["X", "X", "X", "X", "Y", "Y", "Y", "Y"],
+        })
+        result = engine.perform_categorical_test(data, "CAT", "TRT")
+        assert result["p_value"] is not None
+
+    # --- NaN in treatment variable ----------------------------------------------
+
+    def test_nan_treatment_continuous_raises_clear_error(self, engine):
+        """NaN in treatment variable -> ValueError with actionable message."""
+        data = pd.DataFrame({
+            "TRT": ["A", "B", None, "A", "B"],
+            "VAL": [1.0, 2.0, 3.0, 4.0, 5.0],
+        })
+        with pytest.raises(ValueError, match="missing"):
+            engine.calculate_continuous_stats(data, "VAL", "TRT", "n mean")
+
+    def test_nan_treatment_categorical_raises_clear_error(self, engine):
+        data = pd.DataFrame({
+            "TRT": ["A", "B", None, "A", "B"],
+            "CAT": ["X", "Y", "X", "Y", "X"],
+        })
+        with pytest.raises(ValueError, match="missing"):
+            engine.calculate_categorical_stats(data, "CAT", "TRT", "npct")
+
+    def test_missing_treatment_column_raises_clear_error(self, engine):
+        """Treatment column absent -> ValueError, not a bare KeyError."""
+        data = pd.DataFrame({"VAL": [1.0, 2.0]})
+        with pytest.raises(ValueError, match="not found"):
+            engine.calculate_continuous_stats(data, "VAL", "TRT", "n")
+
+    # --- unknown stat keyword -----------------------------------------------------
+
+    def test_unknown_continuous_stat_keyword_raises(self, engine):
+        """Unknown stats= keyword -> ValueError listing valid keywords."""
+        with pytest.raises(ValueError, match="Unknown statistic 'bogus'"):
+            engine._parse_stats_spec("n mean bogus")
+
+    def test_unknown_combined_stat_keyword_raises(self, engine):
+        """Unknown keyword inside a combined spec -> ValueError."""
+        with pytest.raises(ValueError, match="Unknown statistic"):
+            engine._parse_stats_spec("mean+bogus")
+
+    def test_unknown_categorical_stat_keyword_raises(self, engine):
+        with pytest.raises(ValueError, match="Unknown categorical statistic"):
+            engine._parse_categorical_stats_spec("npct bogus")
+
+    def test_valid_stat_specs_still_parse(self, engine):
+        """Regression: documented keywords keep parsing as before."""
+        assert engine._parse_stats_spec("n mean+sd median q1q3 min+max") == [
+            "N", "Mean (SD)", "Median", "Q1, Q3", "Min, Max",
+        ]
+        assert engine._parse_categorical_stats_spec("npct") == ["n_pct"]
+
+    # --- empty groups / empty filtered data ---------------------------------------
+
+    def test_where_clause_removing_all_rows_raises(self, engine):
+        """Where clause that empties the data -> clear ValueError."""
+        data = pd.DataFrame({
+            "TRT": ["A", "B"],
+            "VAL": [1.0, 2.0],
+        })
+        with pytest.raises(ValueError, match="No rows remain"):
+            engine.calculate_continuous_stats(
+                data, "VAL", "TRT", "n mean", where_clause="VAL > 100"
+            )
+
+    def test_empty_group_excluded_from_results(self, engine):
+        """A treatment level with zero rows simply does not appear (the
+        remaining groups and Total stay correct)."""
+        data = pd.DataFrame({
+            "TRT": ["A"] * 3 + ["B"] * 3,
+            "VAL": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+        })
+        result = engine.calculate_continuous_stats(
+            data, "VAL", "TRT", "n", where_clause="TRT == 'A'"
+        )
+        assert set(result["treatment"].unique()) == {"A", "Total"}
+        assert result[result["treatment"] == "Total"]["value"].iloc[0] == 3
