@@ -31,6 +31,13 @@ try:
 except ImportError:
     ClinicalSession = None
 
+# gtsummary-style convenience interface (ARCHITECTURE.md section 6)
+try:
+    from .summary import TblSummaryResult, tbl_summary
+except ImportError:
+    tbl_summary = None
+    TblSummaryResult = None
+
 # Functional reporting system
 try:
     from .functional import FunctionalConfig, ReportSession
@@ -74,6 +81,9 @@ __all__ = [
     "ClinicalSession",
     "ReportSession",
     "FunctionalConfig",
+    # Convenience API
+    "tbl_summary",
+    "TblSummaryResult",
     # Exceptions
     "Py4csrError",
     "DataValidationError",
