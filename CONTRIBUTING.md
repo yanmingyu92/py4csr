@@ -1,42 +1,46 @@
 # Contributing to py4csr
 
-Thank you for your interest in contributing to py4csr! This guide will help you get started with contributing to our clinical study reporting package.
+Thank you for your interest in contributing to py4csr — an ARD-first summary
+table engine for clinical research reporting in Python.
 
-## 🎯 How to Contribute
+> **New here?** Start with issues labeled
+> [`good first issue`](https://github.com/yanmingyu92/py4csr/labels/good%20first%20issue) —
+> each one is written to be self-contained. For the big picture of what the
+> project is (and deliberately is not), read [`ARCHITECTURE.md`](ARCHITECTURE.md).
+> Design proposals under discussion live in [`docs/design/`](docs/design/) and
+> in [GitHub Discussions](https://github.com/yanmingyu92/py4csr/discussions).
 
-There are many ways to contribute to py4csr:
+## Ways to contribute
 
-- **Report bugs** and request features
+- **Report bugs** and request features (open an issue)
 - **Improve documentation** and examples
+- **Review design docs** — the [ARD schema RFC](docs/design/ard-schema-v0.1.md)
+  explicitly asks for critique; a well-argued comment is a full contribution
 - **Submit code** for new features or bug fixes
-- **Review pull requests** from other contributors
-- **Share your experience** using py4csr in clinical research
+- **Extend the validation harness** — every new comparison against a trusted
+  reference makes the engine more credible
 
-## 🚀 Getting Started
+## Getting started
 
-### 1. Fork and Clone the Repository
+### 1. Fork and clone
 
 ```bash
-# Fork the repository on GitHub, then clone your fork
 git clone https://github.com/YOUR-USERNAME/py4csr.git
 cd py4csr
 ```
 
-### 2. Set Up Development Environment
+### 2. Set up a development environment
 
 ```bash
-# Create a virtual environment
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate  # Windows: venv\Scripts\activate
 
-# Install development dependencies
 pip install -e ".[dev]"
 
-# Install pre-commit hooks
 pre-commit install
 ```
 
-### 3. Create a Branch
+### 3. Create a branch
 
 ```bash
 git checkout -b feature/your-feature-name
@@ -44,225 +48,171 @@ git checkout -b feature/your-feature-name
 git checkout -b bugfix/issue-number
 ```
 
-## 🧪 Development Workflow
+## Development workflow
 
-### Running Tests
+### Running tests
 
 ```bash
-# Run all tests
+# All tests
 pytest
 
-# Run specific test categories
-pytest tests/test_functional.py -v
-pytest -m "not slow"  # Skip slow tests
-pytest -m "real_data"  # Run only real data tests
+# Unit tests only (fastest loop while developing)
+pytest tests/unit -v
 
-# Run with coverage
+# Skip slow tests
+pytest -m "not slow"
+
+# Only tests requiring real clinical data
+pytest -m "real_data"
+
+# With coverage
 pytest --cov=py4csr --cov-report=html
 ```
 
-### Code Quality
+Test layout: `tests/unit/`, `tests/integration/`, plus top-level
+`tests/test_real_data.py` for optional real-data runs.
 
-We use several tools to maintain code quality:
+### Code quality
+
+Pre-commit runs the full suite automatically:
 
 ```bash
-# Format code with black
-black py4csr tests
-
-# Sort imports with isort
-isort py4csr tests
-
-# Check code style with flake8
-flake8 py4csr tests
-
-# Type checking with mypy
-mypy py4csr
+pre-commit run --all-files
 ```
+
+This covers: **black** (formatting, line length 88), **isort**, **flake8**,
+**mypy**, **bandit** (security), and **interrogate** (docstring coverage ≥ 80%).
 
 ### Documentation
 
-```bash
-# Build documentation locally
-cd docs
-make html
+Docs are Sphinx-based:
 
-# View documentation
-open _build/html/index.html
+```bash
+sphinx-build -M html docs docs/_build
 ```
 
-## 📝 Coding Standards
+## Coding standards
 
-### Code Style
-- Follow **PEP 8** style guidelines
-- Use **Black** for code formatting (line length: 88)
-- Use **isort** for import sorting
+### Code style
+- Follow **PEP 8**; formatting is enforced by **black** (line length 88)
+- Imports sorted by **isort** (black profile)
 - Add **type hints** for all public functions
 
 ### Documentation
-- Write **docstrings** for all public functions and classes
-- Use **Google-style** docstrings
-- Include **examples** in docstrings when helpful
-- Update **README.md** and docs for new features
+- **Google-style** docstrings for all public functions and classes
+- Include a minimal runnable **example** in docstrings when helpful
+- Update **README.md** / docs for new features
 
 ### Testing
-- Write **unit tests** for all new functionality
-- Include **integration tests** for complex features
-- Test with **real clinical data** when applicable
-- Aim for **>90% test coverage**
+- Write **unit tests** for all new functionality (`tests/unit/`)
+- Include **integration tests** for complex features (`tests/integration/`)
+- Use **synthetic data** for examples and tests (never real patient data)
+- Keep the suite green: `pytest` before every push
 
-## 🏥 Clinical Research Guidelines
+## Clinical research guidelines
 
-Since py4csr is used in clinical research, please follow these guidelines:
+Because py4csr serves clinical research:
 
-### Data Privacy
-- **Never commit real patient data** to the repository
-- Use **synthetic or anonymized data** for examples
-- Follow **HIPAA and GDPR** guidelines in documentation
+### Data privacy
+- **Never commit real patient data**
+- Use **synthetic or fully anonymized** data in all examples and tests
+- Follow HIPAA/GDPR principles in anything you publish
 
-### Regulatory Compliance
-- Ensure new features support **ICH E3** and **CTD** requirements
-- Maintain **CDISC compliance** for data structures
-- Document **validation** and **traceability** for statistical functions
+### Statistical definitions
+- Default statistical definitions follow the references the field already
+  trusts (gtsummary / SAS conventions). See
+  [validation/gtsummary_comparison.md](validation/gtsummary_comparison.md)
+  for what that means in practice, and the [ARD schema](docs/design/ard-schema-v0.1.md)
+  for the output contract.
+- If a change alters a computed number, it must be reflected in the
+  validation harness, not just the docs.
 
-### Industry Standards
-- Follow **pharmaceutical industry** best practices
-- Use **standard terminology** (CDISC, MedDRA, etc.)
-- Consider **regulatory submission** requirements
+## Reporting issues
 
-## 🐛 Reporting Issues
+### Bug reports
+Please include:
 
-### Bug Reports
-When reporting bugs, please include:
+1. Python version and operating system
+2. py4csr version (`py4csr.__version__`)
+3. Minimal reproducible example (synthetic data)
+4. Expected vs. actual behavior
+5. Error messages / stack traces
 
-1. **Python version** and operating system
-2. **py4csr version** (`py4csr.__version__`)
-3. **Minimal reproducible example**
-4. **Expected vs actual behavior**
-5. **Error messages** and stack traces
+### Design discussions
+Bigger ideas (schema changes, new backends, API changes) belong in
+[GitHub Discussions](https://github.com/yanmingyu92/py4csr/discussions) —
+ideally as a comment on an open RFC — so they are visible before any code
+exists.
 
-### Feature Requests
-For new features, please describe:
+## Pull request process
 
-1. **Use case** and clinical context
-2. **Proposed API** or interface
-3. **Examples** of how it would be used
-4. **Regulatory considerations** if applicable
+### Before submitting
+1. Run all tests and ensure they pass
+2. Run `pre-commit run --all-files`
+3. Update documentation for user-facing changes
+4. Add tests for new functionality
+5. Update `CHANGELOG.md`
 
-## 🔄 Pull Request Process
-
-### Before Submitting
-1. **Run all tests** and ensure they pass
-2. **Update documentation** for new features
-3. **Add tests** for new functionality
-4. **Check code quality** with linting tools
-5. **Update CHANGELOG.md** with your changes
-
-### Pull Request Template
+### Pull request template
 ```markdown
 ## Description
 Brief description of changes
 
-## Type of Change
+## Type of change
 - [ ] Bug fix
 - [ ] New feature
 - [ ] Documentation update
-- [ ] Performance improvement
+- [ ] Validation harness extension
 
-## Clinical Context
-How does this relate to clinical research?
+## Clinical context
+How does this relate to clinical reporting?
 
 ## Testing
 - [ ] Unit tests added/updated
-- [ ] Integration tests added/updated
-- [ ] Tested with real data (if applicable)
+- [ ] Integration tests added/updated (if applicable)
 
 ## Checklist
-- [ ] Code follows style guidelines
+- [ ] Code follows style guidelines (pre-commit passes)
 - [ ] Self-review completed
 - [ ] Documentation updated
 - [ ] Tests pass locally
 ```
 
-### Review Process
-1. **Automated checks** must pass (CI/CD)
-2. **Code review** by maintainers
-3. **Testing** with real clinical data (if applicable)
-4. **Documentation review**
-5. **Merge** after approval
+### Review
+1. Automated checks must pass
+2. Maintainer review
+3. Merge after approval
 
-## 🏗️ Development Areas
+## Current development areas
 
-### High Priority
-- **Statistical functions** for clinical endpoints
-- **CDISC metadata** integration
-- **Performance optimization** for large datasets
-- **Regulatory compliance** features
+(See the [public roadmap](https://github.com/users/yanmingyu92/projects/1)
+for the live version.)
 
-### Medium Priority
-- **Interactive dashboards** for clinical data
-- **Cloud deployment** templates
-- **Additional output formats**
-- **Machine learning** integration
+### High priority
+- **Table engine hardening** — edge cases and docs for `tbl_summary()`
+- **ARD schema v0.2** — driven by the [RFC](docs/design/ard-schema-v0.1.md)
+- **Rendering backends** — great_tables (HTML/Word) and rtflite (RTF)
+  integration
+- **Validation extensions** — new datasets and comparison targets
 
-### Documentation Needs
-- **More examples** with real clinical scenarios
-- **Video tutorials** for common workflows
-- **Best practices** guides
-- **Regulatory submission** templates
+### Welcome contributions
+- Examples and notebooks (AE tables, shift tables)
+- Windows/macOS setup walkthroughs
+- Schema critique and naming review
+- Synthetic data generators
 
-## 🤝 Community Guidelines
+## Code of conduct
 
-### Code of Conduct
-- Be **respectful** and **inclusive**
-- Focus on **constructive feedback**
-- Help **newcomers** to clinical research
-- Maintain **professional standards**
+This project follows the [Code of Conduct](CODE_OF_CONDUCT.md). By
+participating, you agree to uphold it.
 
-### Communication
-- Use **GitHub Issues** for bug reports and feature requests
-- Use **GitHub Discussions** for questions and ideas
-- Join our **community calls** (monthly)
-- Follow us on **social media** for updates
+## Getting help
 
-## 🎓 Learning Resources
+1. Read the [documentation](https://github.com/yanmingyu92/py4csr/tree/main/docs)
+2. Search existing issues
+3. Open a new issue (bugs) or discussion (questions/ideas)
 
-### Clinical Research
-- [CDISC Standards](https://www.cdisc.org/)
-- [ICH Guidelines](https://www.ich.org/)
-- [FDA Guidance Documents](https://www.fda.gov/drugs/guidance-compliance-regulatory-information)
+## License
 
-### Python Development
-- [Python Style Guide (PEP 8)](https://pep8.org/)
-- [Type Hints (PEP 484)](https://www.python.org/dev/peps/pep-0484/)
-- [Testing with pytest](https://docs.pytest.org/)
-
-### Statistical Computing
-- [Pandas Documentation](https://pandas.pydata.org/docs/)
-- [SciPy Documentation](https://docs.scipy.org/)
-- [Clinical Statistics Resources](https://www.appliedclinicaltrialsonline.com/)
-
-## 🏆 Recognition
-
-Contributors will be recognized in:
-- **CHANGELOG.md** for each release
-- **Contributors section** in README
-- **Annual contributor report**
-- **Conference presentations** (with permission)
-
-## 📞 Getting Help
-
-If you need help contributing:
-
-1. **Read the documentation** thoroughly
-2. **Search existing issues** and discussions
-3. **Ask in GitHub Discussions**
-4. **Join our community calls**
-5. **Email the maintainers**: dev@py4csr.org
-
-## 📄 License
-
-By contributing to py4csr, you agree that your contributions will be licensed under the MIT License.
-
----
-
-Thank you for helping make py4csr better for the clinical research community! 🚀 
+By contributing, you agree that your contributions will be licensed under the
+MIT License.
