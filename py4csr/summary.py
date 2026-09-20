@@ -21,21 +21,41 @@ DEFAULT_CAT_STATS = "npct"
 
 class TblSummaryResult:
     """
-    Result of :func:`tbl_summary`.
+    Result returned by :func:`tbl_summary`.
 
-    Attributes
-    ----------
-    ard : pd.DataFrame
-        Long-format Analysis Results Dataset: one row per
-        (variable, statistic/category, treatment) result, with raw ``value``
-        and ``formatted_value`` columns.
-    p_values : dict
-        Variable label -> formatted p-value string.
-    p_value_tests : dict
-        Variable label -> name of the statistical test actually used.
+    Args:
+        session: Generated clinical analysis session. Use :func:`tbl_summary`
+            to create a result for normal application code.
+        by: Name of the variable used to group the table columns.
+
+    Attributes:
+        by: Name of the variable used to group the table columns.
+        ard: Long-format Analysis Results Dataset (ARD), with one row per
+            variable, statistic or category, and treatment result.
+        p_values: Mapping from variable labels to formatted p-value strings.
+        p_value_tests: Mapping from variable labels to the test names used.
+
+    Examples:
+        >>> from contextlib import redirect_stdout
+        >>> from io import StringIO
+        >>> import pandas as pd
+        >>> import py4csr
+        >>> data = pd.DataFrame({"TRT": ["A", "A", "B", "B"],
+        ...                      "AGE": [42, 50, 45, 53]})
+        >>> with redirect_stdout(StringIO()):
+        ...     result = py4csr.tbl_summary(data, by="TRT", include=["AGE"])
+        >>> result.by
+        'TRT'
     """
 
     def __init__(self, session: ClinicalSession, by: str):
+        """Initialize the result wrapper around a generated session.
+
+        Args:
+            session: Generated clinical analysis session that owns the result
+                data and display table.
+            by: Name of the grouping variable used for the table columns.
+        """
         self._session = session
         self.by = by
         self.ard = session.generated_data
@@ -43,19 +63,74 @@ class TblSummaryResult:
         self.p_value_tests = session.p_value_tests
 
     def to_table(self) -> pd.DataFrame:
-        """Return the wide display table (treatment groups across columns)."""
+        """Return the wide display table with treatment groups as columns.
+
+        Returns:
+            pandas.DataFrame: The generated table.
+
+        Examples:
+            >>> from contextlib import redirect_stdout
+            >>> from io import StringIO
+            >>> import pandas as pd
+            >>> import py4csr
+            >>> data = pd.DataFrame({"TRT": ["A", "A", "B", "B"],
+            ...                      "AGE": [42, 50, 45, 53]})
+            >>> with redirect_stdout(StringIO()):
+            ...     result = py4csr.tbl_summary(data, by="TRT", include=["AGE"])
+            >>> table = result.to_table()
+            >>> "A" in table.columns
+            True
+        """
         return self._session.generated_table
 
     def preview(self, max_rows: int = 20) -> pd.DataFrame:
-        """Return the first ``max_rows`` rows of the display table."""
+        """Return the first rows of the display table.
+
+        Args:
+            max_rows: Maximum number of rows to return. Defaults to 20.
+
+        Returns:
+            pandas.DataFrame: The requested leading rows.
+
+        Examples:
+            >>> from contextlib import redirect_stdout
+            >>> from io import StringIO
+            >>> import pandas as pd
+            >>> import py4csr
+            >>> data = pd.DataFrame({"TRT": ["A", "A", "B", "B"],
+            ...                      "AGE": [42, 50, 45, 53]})
+            >>> with redirect_stdout(StringIO()):
+            ...     result = py4csr.tbl_summary(data, by="TRT", include=["AGE"])
+            >>> with redirect_stdout(StringIO()):
+            ...     preview = result.preview(max_rows=5)
+        """
         return self._session.preview(max_rows=max_rows)
 
     def __repr__(self):
+        """Return a concise representation of the result.
+
+        Returns:
+            str: The result type, grouping variable, and table shape, or its
+                not-generated state.
+
+        Examples:
+            >>> from contextlib import redirect_stdout
+            >>> from io import StringIO
+            >>> import pandas as pd
+            >>> import py4csr
+            >>> data = pd.DataFrame({"TRT": ["A", "A", "B", "B"],
+            ...                      "AGE": [42, 50, 45, 53]})
+            >>> with redirect_stdout(StringIO()):
+            ...     result = py4csr.tbl_summary(data, by="TRT", include=["AGE"])
+            >>> repr(result).startswith("TblSummaryResult(by='TRT'")
+            True
+        """
         table = self._session.generated_table
         if table is None:
             return "TblSummaryResult(<not generated>)"
-        return f"TblSummaryResult(by={self.by!r}, shape={table.shape})\n" + table.to_string(
-            index=False
+        return (
+            f"TblSummaryResult(by={self.by!r}, shape={table.shape})\n"
+            + table.to_string(index=False)
         )
 
 
@@ -70,63 +145,57 @@ def tbl_summary(
     type: Union[Dict[str, str], None] = None,
     test: Union[Dict[str, str], str, None] = None,
 ) -> TblSummaryResult:
-    """
-    Build a by-treatment summary table (gtsummary-style convenience API).
+    """Build a treatment-group summary table.
 
-    Thin wrapper over the existing table engine; see ARCHITECTURE.md §6.
+    Numeric variables are treated as continuous. Other variables are treated
+    as categorical unless ``type`` overrides their classification.
 
-    Parameters
-    ----------
-    data : pd.DataFrame
-        Input dataset (e.g. ADSL)
-    by : str
-        Treatment/grouping variable (columns of the table)
-    include : list of str
-        Variables to summarize. Numeric variables are summarized as
-        continuous, others as categorical; override per variable with
-        ``type={"VAR": "continuous"}`` / ``"categorical"``.
-    statistic : dict, optional
-        Per-variable stats spec using the existing mini-language, e.g.
-        ``{"AGE": "n mean+sd median q1q3 min+max", "SEX": "npct"}``.
-        Defaults: ``"n mean+sd median q1q3 min+max"`` (continuous),
-        ``"npct"`` (categorical).
-    label : dict, optional
-        Per-variable display labels.
-    where : str, optional
-        Population filter, pandas query syntax (e.g. ``"SAFFL == 'Y'"``).
-    total : bool
-        Keep the Total column (default True).
-    type : dict, optional
-        Per-variable type override: "continuous" or "categorical".
-    test : str or dict, optional
-        Statistical test selection: a single test name applied to all
-        variables, or a per-variable dict. Defaults ("auto") follow
-        gtsummary: Wilcoxon rank-sum / Kruskal-Wallis for continuous,
-        Pearson chi-square (Fisher's exact when any expected count < 5)
-        for categorical. See ``add_var``/``add_catvar`` for valid names.
+    Args:
+        data: Input dataset as a pandas DataFrame.
+        by: Column that defines the treatment or grouping columns.
+        include: Non-empty list of columns to summarize.
+        statistic: Optional per-variable statistic specifications. Continuous
+            variables default to ``"n mean+sd median q1q3 min+max"`` and
+            categorical variables default to ``"npct"``.
+        label: Optional per-variable display labels.
+        where: Optional pandas query expression that selects the analysis
+            population. An empty string includes every row.
+        total: Whether to include the Total column. Defaults to True.
+        type: Optional per-variable type override. Values must be
+            ``"continuous"`` or ``"categorical"``.
+        test: Optional test name for all variables or a per-variable mapping.
+            When omitted, the engine selects tests automatically. Valid names
+            are the same as those accepted by ``ClinicalSession.add_var`` and
+            ``ClinicalSession.add_catvar``.
 
-    Returns
-    -------
-    TblSummaryResult
-        Object with ``.ard`` (long results DataFrame), ``.to_table()``
-        (wide display table), ``.preview()``, ``.p_values`` and
-        ``.p_value_tests``.
+    Returns:
+        TblSummaryResult: Result with the long-format ``ard``, wide display
+        table, and selected p-value tests.
 
-    Examples
-    --------
-    >>> import py4csr
-    >>> tbl = py4csr.tbl_summary(
-    ...     data=adsl, by="TRT01P", include=["AGE", "SEX"],
-    ...     label={"AGE": "Age (years)", "SEX": "Sex, n (%)"},
-    ...     where="SAFFL == 'Y'",
-    ... )
-    >>> tbl.ard          # long-format results
-    >>> tbl.to_table()   # wide display table
+    Raises:
+        TypeError: If ``data`` is not a pandas DataFrame.
+        ValueError: If ``by`` or an included column is missing, ``include``
+            is empty, or a type override is invalid.
+
+    Examples:
+        >>> from contextlib import redirect_stdout
+        >>> from io import StringIO
+        >>> import pandas as pd
+        >>> import py4csr
+        >>> data = pd.DataFrame({
+        ...     "SUBJID": ["S001", "S002", "S003", "S004"],
+        ...     "TRT": ["A", "A", "B", "B"],
+        ...     "AGE": [42, 50, 45, 53],
+        ... })
+        >>> with redirect_stdout(StringIO()):
+        ...     result = py4csr.tbl_summary(
+        ...         data, by="TRT", include=["AGE"], test="ttest"
+        ...     )
+        >>> table = result.to_table()
     """
     if not isinstance(data, pd.DataFrame):
         raise TypeError(
-            "data must be a pandas DataFrame, got "
-            + data.__class__.__name__
+            "data must be a pandas DataFrame, got " + data.__class__.__name__
         )
     if by not in data.columns:
         raise ValueError(f"Grouping variable '{by}' not found in data")
@@ -139,8 +208,8 @@ def tbl_summary(
     statistic = statistic or {}
     label = label or {}
     type = type or {}
-    test_spec = test if isinstance(test, dict) else (
-        {v: test for v in include} if test else {}
+    test_spec = (
+        test if isinstance(test, dict) else ({v: test for v in include} if test else {})
     )
 
     session = ClinicalSession(uri="tbl_summary")
