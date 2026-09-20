@@ -1,0 +1,101 @@
+variable,category,treatment,statistic,py4csr,reference,abs_diff,match,gtsummary_documented,doc_match,source
+AGE,,Drug A,n,91.0,91.0,0.0,True,,,generated_data
+AGE,,Drug A,mean,47.010989010989015,47.010989010989015,0.0,True,47.01,True,generated_data
+AGE,,Drug A,sd,14.709403270239909,14.709403270239909,0.0,True,14.71,True,generated_data
+AGE,,Drug A,median,46.0,46.0,0.0,True,46.0,True,generated_data
+AGE,,Drug A,q1,37.0,37.0,0.0,True,37.0,True,generated_data
+AGE,,Drug A,q3,60.0,60.0,0.0,True,60.0,True,generated_data
+AGE,,Drug A,min,6.0,6.0,0.0,True,6.0,True,generated_data
+AGE,,Drug A,max,78.0,78.0,0.0,True,78.0,True,generated_data
+AGE,,Drug B,n,98.0,98.0,0.0,True,,,generated_data
+AGE,,Drug B,mean,47.44897959183673,47.44897959183673,0.0,True,47.45,True,generated_data
+AGE,,Drug B,sd,14.005243825729558,14.005243825729558,0.0,True,14.01,True,generated_data
+AGE,,Drug B,median,48.0,48.0,0.0,True,48.0,True,generated_data
+AGE,,Drug B,q1,39.0,39.0,0.0,True,39.0,True,generated_data
+AGE,,Drug B,q3,56.0,56.0,0.0,True,56.0,True,generated_data
+AGE,,Drug B,min,9.0,9.0,0.0,True,9.0,True,generated_data
+AGE,,Drug B,max,83.0,83.0,0.0,True,83.0,True,generated_data
+AGE,,Total,n,189.0,189.0,0.0,True,,,generated_data
+AGE,,Total,mean,47.23809523809524,47.23809523809524,0.0,True,,,generated_data
+AGE,,Total,sd,14.311928835446377,14.311928835446377,0.0,True,,,generated_data
+AGE,,Total,median,47.0,47.0,0.0,True,47.0,True,generated_data
+AGE,,Total,q1,38.0,38.0,0.0,True,38.0,True,generated_data
+AGE,,Total,q3,57.0,57.0,0.0,True,57.0,True,generated_data
+AGE,,Total,min,6.0,6.0,0.0,True,,,generated_data
+AGE,,Total,max,83.0,83.0,0.0,True,,,generated_data
+AGEGR1,<65,Drug A,n,79.0,79.0,0.0,True,,,generated_data
+AGEGR1,<65,Drug A,pct,80.61224489795919,80.61224489795919,0.0,True,,,generated_data
+AGEGR1,>=65,Drug A,n,12.0,12.0,0.0,True,,,generated_data
+AGEGR1,>=65,Drug A,pct,12.244897959183673,12.244897959183673,0.0,True,,,generated_data
+AGEGR1,Missing,Drug A,n,7.0,7.0,0.0,True,,,generated_data
+AGEGR1,Missing,Drug A,pct,7.142857142857142,7.142857142857142,0.0,True,,,generated_data
+AGEGR1,<65,Drug B,n,84.0,84.0,0.0,True,,,generated_data
+AGEGR1,<65,Drug B,pct,82.35294117647058,82.35294117647058,0.0,True,,,generated_data
+AGEGR1,>=65,Drug B,n,14.0,14.0,0.0,True,,,generated_data
+AGEGR1,>=65,Drug B,pct,13.725490196078432,13.725490196078432,0.0,True,,,generated_data
+AGEGR1,Missing,Drug B,n,4.0,4.0,0.0,True,,,generated_data
+AGEGR1,Missing,Drug B,pct,3.9215686274509802,3.9215686274509802,0.0,True,,,generated_data
+AGEGR1,<65,Total,n,163.0,163.0,0.0,True,,,generated_data
+AGEGR1,<65,Total,pct,81.5,81.5,0.0,True,,,generated_data
+AGEGR1,>=65,Total,n,26.0,26.0,0.0,True,,,generated_data
+AGEGR1,>=65,Total,pct,13.0,13.0,0.0,True,,,generated_data
+AGEGR1,Missing,Total,n,11.0,11.0,0.0,True,,,generated_data
+AGEGR1,Missing,Total,pct,5.5,5.5,0.0,True,,,generated_data
+GRADE,I,Drug A,n,35.0,35.0,0.0,True,35.0,True,generated_data
+GRADE,I,Drug A,pct,35.714285714285715,35.714285714285715,0.0,True,,,generated_data
+GRADE,II,Drug A,n,32.0,32.0,0.0,True,32.0,True,generated_data
+GRADE,II,Drug A,pct,32.6530612244898,32.6530612244898,0.0,True,,,generated_data
+GRADE,III,Drug A,n,31.0,31.0,0.0,True,31.0,True,generated_data
+GRADE,III,Drug A,pct,31.63265306122449,31.63265306122449,0.0,True,,,generated_data
+GRADE,I,Drug B,n,33.0,33.0,0.0,True,33.0,True,generated_data
+GRADE,I,Drug B,pct,32.35294117647059,32.35294117647059,0.0,True,,,generated_data
+GRADE,II,Drug B,n,36.0,36.0,0.0,True,36.0,True,generated_data
+GRADE,II,Drug B,pct,35.294117647058826,35.294117647058826,0.0,True,,,generated_data
+GRADE,III,Drug B,n,33.0,33.0,0.0,True,33.0,True,generated_data
+GRADE,III,Drug B,pct,32.35294117647059,32.35294117647059,0.0,True,,,generated_data
+GRADE,I,Total,n,68.0,68.0,0.0,True,68.0,True,generated_data
+GRADE,I,Total,pct,34.0,34.0,0.0,True,,,generated_data
+GRADE,II,Total,n,68.0,68.0,0.0,True,68.0,True,generated_data
+GRADE,II,Total,pct,34.0,34.0,0.0,True,,,generated_data
+GRADE,III,Total,n,64.0,64.0,0.0,True,64.0,True,generated_data
+GRADE,III,Total,pct,32.0,32.0,0.0,True,,,generated_data
+STAGE,T1,Drug A,n,28.0,28.0,0.0,True,28.0,True,generated_data
+STAGE,T1,Drug A,pct,28.57142857142857,28.57142857142857,0.0,True,,,generated_data
+STAGE,T2,Drug A,n,25.0,25.0,0.0,True,25.0,True,generated_data
+STAGE,T2,Drug A,pct,25.510204081632654,25.510204081632654,0.0,True,,,generated_data
+STAGE,T3,Drug A,n,22.0,22.0,0.0,True,22.0,True,generated_data
+STAGE,T3,Drug A,pct,22.448979591836736,22.448979591836736,0.0,True,,,generated_data
+STAGE,T4,Drug A,n,23.0,23.0,0.0,True,23.0,True,generated_data
+STAGE,T4,Drug A,pct,23.46938775510204,23.46938775510204,0.0,True,,,generated_data
+STAGE,T1,Drug B,n,25.0,25.0,0.0,True,25.0,True,generated_data
+STAGE,T1,Drug B,pct,24.509803921568626,24.509803921568626,0.0,True,,,generated_data
+STAGE,T2,Drug B,n,29.0,29.0,0.0,True,29.0,True,generated_data
+STAGE,T2,Drug B,pct,28.431372549019606,28.431372549019606,0.0,True,,,generated_data
+STAGE,T3,Drug B,n,21.0,21.0,0.0,True,21.0,True,generated_data
+STAGE,T3,Drug B,pct,20.588235294117645,20.588235294117645,0.0,True,,,generated_data
+STAGE,T4,Drug B,n,27.0,27.0,0.0,True,27.0,True,generated_data
+STAGE,T4,Drug B,pct,26.47058823529412,26.47058823529412,0.0,True,,,generated_data
+STAGE,T1,Total,n,53.0,53.0,0.0,True,,,generated_data
+STAGE,T1,Total,pct,26.5,26.5,0.0,True,,,generated_data
+STAGE,T2,Total,n,54.0,54.0,0.0,True,,,generated_data
+STAGE,T2,Total,pct,27.0,27.0,0.0,True,,,generated_data
+STAGE,T3,Total,n,43.0,43.0,0.0,True,,,generated_data
+STAGE,T3,Total,pct,21.5,21.5,0.0,True,,,generated_data
+STAGE,T4,Total,n,50.0,50.0,0.0,True,,,generated_data
+STAGE,T4,Total,pct,25.0,25.0,0.0,True,,,generated_data
+AGEGR1,Missing,Drug A,n,7.0,7.0,0.0,True,,,generated_data
+AGE,,Drug A,n_missing,7.0,7.0,0.0,True,7.0,True,generated_data
+AGEGR1,Missing,Drug B,n,4.0,4.0,0.0,True,,,generated_data
+AGE,,Drug B,n_missing,4.0,4.0,0.0,True,4.0,True,generated_data
+AGEGR1,Missing,Total,n,11.0,11.0,0.0,True,,,generated_data
+AGE,,Total,n_missing,11.0,11.0,0.0,True,11.0,True,generated_data
+AGE,,,p_wilcoxon,0.7183173247379252,0.7183173247379252,0.0,True,0.72,True,stats_engine
+AGE,,,p_anova,0.8341436830378057,0.8341436830378057,0.0,True,,,stats_engine
+AGEGR1,,,p_chisq,0.8265326948342352,0.8265326948342352,0.0,True,,,stats_engine
+GRADE,,,p_chisq,0.8707815221898352,0.8707815221898352,0.0,True,0.87,True,stats_engine
+STAGE,,,p_chisq,0.8662075404490096,0.8662075404490096,0.0,True,,,stats_engine
+AGE,,,p_wilcoxon (session.p_values),0.718,0.7183173247379252,0.00031732473792522864,True,,,session.p_values
+AGEGR1,,,p_chisq (session.p_values),0.827,0.8265326948342352,0.0004673051657647642,True,,,session.p_values
+GRADE,,,p_chisq (session.p_values),0.871,0.8707815221898352,0.00021847781016481882,True,,,session.p_values
+STAGE,,,p_chisq (session.p_values),0.866,0.8662075404490096,0.00020754044900961333,True,,,session.p_values
+AGE,,,p_wilcoxon (gtsummary documented anchor),0.7183173247379252,0.7183173247379252,,,0.72,True,reference
