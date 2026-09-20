@@ -484,9 +484,12 @@ def apply_cdisc_formats(data: pd.DataFrame, dataset_type: str) -> pd.DataFrame:
 
     # Dataset-specific formatting
     if dataset_type.upper() == "ADSL":
-        # Ensure subject ID is string
+        # Ensure subject ID is string (object dtype of Python strings, stable
+        # across pandas versions: astype(str) yields StringDtype in pandas >= 3)
         if "USUBJID" in formatted_data.columns:
-            formatted_data["USUBJID"] = formatted_data["USUBJID"].astype(str)
+            formatted_data["USUBJID"] = (
+                formatted_data["USUBJID"].astype(str).astype(object)
+            )
 
         # Standardize flag variables
         flag_vars = [col for col in formatted_data.columns if col.endswith("FL")]

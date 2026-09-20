@@ -104,7 +104,8 @@ def handle_missing_data(
 
     elif strategy == "forward_fill":
         # Forward fill missing values
-        result_data = result_data.fillna(method="ffill")
+        # (pandas >= 2.1 removed fillna(method=...); use ffill() directly)
+        result_data = result_data.ffill()
 
     else:
         raise ValueError(f"Unknown missing data strategy: {strategy}")

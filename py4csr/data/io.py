@@ -48,16 +48,16 @@ def read_sas(
     >>> adsl = read_sas("data/adsl.sas7bdat")
     >>> adae = read_sas("data/adae.sas7bdat", encoding="utf-8")
     """
+    filepath = Path(filepath)
+
+    if not filepath.exists():
+        raise FileNotFoundError(f"File not found: {filepath}")
+
     if not HAS_PYREADSTAT:
         raise ImportError(
             "pyreadstat is required to read SAS files. "
             "Install it with: pip install py4csr[sas]"
         )
-
-    filepath = Path(filepath)
-
-    if not filepath.exists():
-        raise FileNotFoundError(f"File not found: {filepath}")
 
     if not filepath.suffix.lower() == ".sas7bdat":
         warnings.warn(f"Expected .sas7bdat file, got {filepath.suffix}")
@@ -97,16 +97,16 @@ def read_xpt(
     pd.DataFrame
         DataFrame containing the clinical data
     """
+    filepath = Path(filepath)
+
+    if not filepath.exists():
+        raise FileNotFoundError(f"File not found: {filepath}")
+
     if not HAS_PYREADSTAT:
         raise ImportError(
             "pyreadstat is required to read XPT files. "
             "Install it with: pip install py4csr[sas]"
         )
-
-    filepath = Path(filepath)
-
-    if not filepath.exists():
-        raise FileNotFoundError(f"File not found: {filepath}")
 
     try:
         df, meta = pyreadstat.read_xport(str(filepath), encoding=encoding, **kwargs)

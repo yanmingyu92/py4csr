@@ -183,5 +183,6 @@ class TestValidationHelpers:
     def test_data_type_detection(self, sample_adsl):
         """Test detecting data types."""
         assert pd.api.types.is_numeric_dtype(sample_adsl["AGE"])
-        assert pd.api.types.is_object_dtype(sample_adsl["USUBJID"])
+        # pandas >= 3 infers StringDtype instead of object for string columns
+        assert pd.api.types.is_string_dtype(sample_adsl["USUBJID"])
 
