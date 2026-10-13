@@ -11,16 +11,9 @@ Experiment only — lives in validation/, no py4csr source is modified.
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 import pandas as pd
-
-# The editable install of py4csr resolves to the repo root as a namespace
-# package; make sure the real package directory is importable.
-_REPO_ROOT = Path(__file__).resolve().parents[1] / "py4csr"
-if _REPO_ROOT.is_dir() and str(_REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(_REPO_ROOT))
 
 import rtflite as rtf
 

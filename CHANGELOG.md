@@ -35,6 +35,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `.to_table()`, `.preview()`, `.p_values` and `.p_value_tests`.
 
 ### Fixed
+- Packaging: package discovery is now restricted to `include = ["py4csr*"]` in
+  `pyproject.toml`, so built wheels/sdists no longer leak the repo-root
+  `validation/` directory as a stray top-level package alongside `py4csr`.
 - pandas 3.0 compatibility: `fillna(method="ffill")` replaced with `.ffill()` in
   `data/preprocessing.py`; `apply_cdisc_formats` keeps USUBJID as object-dtype
   strings (`astype(str)` yields StringDtype in pandas >= 3); `read_sas`/`read_xpt`

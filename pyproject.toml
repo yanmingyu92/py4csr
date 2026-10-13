@@ -125,7 +125,7 @@ Changelog = "https://github.com/yanmingyu92/py4csr/blob/main/CHANGELOG.md"
 Discussions = "https://github.com/yanmingyu92/py4csr/discussions"
 
 [tool.setuptools]
-packages = {find = {where = ["."], exclude = ["tests*", "docs*", "examples*", "archive*", "agent*", "llm_learning_pipeline*", "py4csr_testing_suite*", "paper*", "experiment_results*", "htmlcov*", "08_publication*", "04_generated_code*", "06_evaluation*"]}}
+packages = {find = {where = ["."], include = ["py4csr*"], exclude = ["tests*", "docs*", "examples*", "validation*", "archive*", "agent*", "llm_learning_pipeline*", "py4csr_testing_suite*", "paper*", "experiment_results*", "htmlcov*", "08_publication*", "04_generated_code*", "06_evaluation*"]}}
 
 [tool.setuptools.package-data]
 py4csr = [
