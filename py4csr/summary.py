@@ -25,6 +25,8 @@ class TblSummaryResult:
 
     Attributes
     ----------
+    by : str
+        Treatment/grouping variable the table is summarised by.
     ard : pd.DataFrame
         Long-format Analysis Results Dataset: one row per
         (variable, statistic/category, treatment) result, with raw ``value``
@@ -33,9 +35,13 @@ class TblSummaryResult:
         Variable label -> formatted p-value string.
     p_value_tests : dict
         Variable label -> name of the statistical test actually used.
+
+    The wide display table is available through the ``to_table()`` and
+    ``preview()`` methods, not as attributes.
     """
 
     def __init__(self, session: ClinicalSession, by: str):
+        """Wrap a generated session; see the class docstring."""
         self._session = session
         self.by = by
         self.ard = session.generated_data
@@ -114,14 +120,29 @@ def tbl_summary(
 
     Examples
     --------
-    >>> import py4csr
-    >>> tbl = py4csr.tbl_summary(
-    ...     data=adsl, by="TRT01P", include=["AGE", "SEX"],
-    ...     label={"AGE": "Age (years)", "SEX": "Sex, n (%)"},
-    ...     where="SAFFL == 'Y'",
-    ... )
-    >>> tbl.ard          # long-format results
-    >>> tbl.to_table()   # wide display table
+    The example below is a plain code block, not a doctest: the table
+    engine prints progress lines while generating, so a ``>>>`` prompt
+    example would not match doctest output. It is self-contained and
+    runs as a script (``adsl`` in the previous version was undefined)::
+
+        import pandas as pd
+
+        import py4csr
+
+        data = pd.DataFrame({
+            "USUBJID": ["S1", "S2", "S3", "S4"],
+            "TRT01P": ["Drug A", "Drug A", "Drug B", "Drug B"],
+            "AGE": [50.0, 60.0, 55.0, 65.0],
+            "SEX": ["M", "F", "M", "F"],
+            "SAFFL": ["Y", "Y", "Y", "Y"],
+        })
+        tbl = py4csr.tbl_summary(
+            data=data, by="TRT01P", include=["AGE", "SEX"],
+            label={"AGE": "Age (years)", "SEX": "Sex, n (%)"},
+            where="SAFFL == 'Y'",
+        )
+        tbl.ard        # long-format results
+        tbl.to_table()  # wide display table
     """
     if not isinstance(data, pd.DataFrame):
         raise TypeError(
