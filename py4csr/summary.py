@@ -57,6 +57,7 @@ class TblSummaryResult:
         return self._session.preview(max_rows=max_rows)
 
     def __repr__(self):
+        """Show the treatment variable, table shape and the first rows."""
         table = self._session.generated_table
         if table is None:
             return "TblSummaryResult(<not generated>)"
